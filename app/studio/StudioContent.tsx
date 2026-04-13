@@ -164,57 +164,20 @@ export default function StudioContent() {
         {/* Gradient vignette */}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-black/40" />
 
-        {/* Outlined STUDIO — background layer */}
+        {/* Outlined STUDIO — sole typographic element, perfectly centered */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
           <span
-            className="font-display font-black uppercase leading-none tracking-tighter"
+            className="font-display font-black uppercase leading-none"
             style={{
               fontSize: "clamp(7rem, 22vw, 24rem)",
-              WebkitTextStroke: "1.5px rgba(255,255,255,0.08)",
+              WebkitTextStroke: "1.5px white",
               color: "transparent",
+              opacity: 0.45,
               letterSpacing: "-0.04em",
             }}
           >
             STUDIO
           </span>
-        </div>
-
-        {/* Foreground manifesto */}
-        <div className="relative z-10 h-full flex flex-col items-center justify-center text-center px-6 gap-6">
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-[10px] tracking-[0.35em] uppercase text-zinc-500 font-sans"
-          >
-            Spring / Summer 2025
-          </motion.p>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.9, delay: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="font-display font-black uppercase text-white leading-[0.88] tracking-tighter"
-            style={{ fontSize: "clamp(3rem, 10vw, 9rem)" }}
-          >
-            Good Vibes<br />Defined.
-          </motion.h1>
-
-          <motion.div
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: 1 }}
-            transition={{ duration: 0.6, delay: 0.7 }}
-            className="w-12 h-px bg-zinc-600 origin-left"
-          />
-
-          <motion.p
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.85 }}
-            className="text-sm font-sans font-light text-zinc-400 tracking-widest max-w-xs leading-relaxed uppercase"
-          >
-            The creative space behind the vibe.
-          </motion.p>
         </div>
 
         {/* Scroll indicator */}
