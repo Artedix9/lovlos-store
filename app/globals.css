@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #000000;
+  --charcoal: #242424;
+  --mine: #3b3b3b;
+  --chicago: #636363;
+  --dawn: #a3a3a3;
+  --alto: #cccccc;
+  --mercury: #e1e1e1;
+  --smoke: #f2f2f2;
+  --white: #ffffff;
+  --sand: #e0d7d1;
+  --highlight-light: #f1e8dd;
+  --highlight-medium: #ceb18f;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    color: var(--primary);
+    background-color: var(--white);
+    font-family: var(--font-inter), Helvetica, sans-serif;
+  }
+}
+
+@layer utilities {
+  .tracking-ultra {
+    letter-spacing: 0.3em;
+  }
+
+  .nav-link {
+    @apply text-xs tracking-widest uppercase text-primary transition-colors duration-200 hover:text-chicago;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-white text-xs tracking-widest uppercase px-8 py-3 transition-colors duration-200 hover:bg-charcoal;
+  }
+
+  .btn-outline {
+    @apply border border-primary text-primary text-xs tracking-widest uppercase px-8 py-3 transition-colors duration-200 hover:bg-primary hover:text-white;
+  }
+}
