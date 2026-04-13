@@ -3,55 +3,26 @@ import Link from "next/link";
 import Image from "next/image";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import ProductCard, { type Product } from "@/components/ProductCard";
+import ProductCard from "@/components/ProductCard";
+import { PRODUCTS } from "@/lib/products";
+import type { Product } from "@/components/ProductCard";
 
 export const metadata: Metadata = {
   title: "Women — LOVLOS",
   description: "Discover the LOVLOS women's collection. Effortless, premium pieces for movement and life.",
 };
 
-const PRODUCTS: Product[] = [
-  {
-    id: "w1", name: "Crop Top", price: 85000,
-    href: "/product/crop-top", badge: "New",
-    image: "/Crop-top 1a.png",
-  },
-  {
-    id: "w2", name: "Relaxed Crop Top", price: 85000,
-    href: "/product/relaxed-crop-top",
-    image: "/Crop-top 2a.png",
-  },
-  {
-    id: "w3", name: "Long Sleeve Crop Top", price: 98000,
-    href: "/product/long-sleeve-crop-top", badge: "Best Seller",
-    image: "/Crop-top Long-sleeves(W)a.png",
-  },
-  {
-    id: "w4", name: "Long Sleeve Crop Top — Black", price: 98000,
-    href: "/product/long-sleeve-crop-top-black",
-    image: "/Crop-top Long-sleeves(B)a.png",
-  },
-  {
-    id: "w5", name: "Ribbed Crop Vest", price: 75000,
-    href: "/product/ribbed-crop-vest", badge: "New",
-    image: "/Crop vest -a.png",
-  },
-  {
-    id: "w6", name: "Essential Crop Vest", price: 75000,
-    href: "/product/essential-crop-vest",
-    image: "/Crop vest 2-a.png",
-  },
-  {
-    id: "w7", name: "Loose Crop Top", price: 90000,
-    href: "/product/loose-crop-top",
-    image: "/Loose Crop Top (B)a.png",
-  },
-  {
-    id: "w8", name: "Sports Crop Top", price: 80000,
-    href: "/product/sports-crop-top",
-    image: "/Crop top sports.png",
-  },
-];
+const WOMEN_PRODUCTS: Product[] = PRODUCTS
+  .filter((p) => p.category === "Women")
+  .map((p) => ({
+    id: p.id,
+    name: p.name,
+    price: p.price,
+    href: `/product/${p.id}`,
+    badge: p.badge,
+    image: p.images[0],
+    isComingSoon: p.isComingSoon,
+  }));
 
 const CATEGORIES = [
   {
@@ -79,7 +50,6 @@ export default function WomenPage() {
 
       {/* ── Hero Banner ── */}
       <section className="relative w-full h-[70vh] min-h-[480px] overflow-hidden">
-        {/* Hero background image */}
         <Image
           src="https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?auto=format&fit=crop&w=1800&q=85"
           alt="Women's collection hero"
@@ -88,7 +58,6 @@ export default function WomenPage() {
           className="object-cover object-center"
           sizes="100vw"
         />
-        {/* Gradient overlay so text stays legible */}
         <div className="absolute inset-0 bg-gradient-to-r from-white/70 via-white/30 to-transparent" />
 
         <div className="relative flex flex-col justify-end h-full pb-10 md:pb-16 px-5 md:px-16 lg:px-24">
@@ -112,12 +81,12 @@ export default function WomenPage() {
         <div className="flex items-baseline justify-between mb-10">
           <h2 className="font-display text-3xl font-bold uppercase tracking-tight">New Arrivals</h2>
           <span className="text-xs tracking-widest uppercase text-chicago">
-            {PRODUCTS.length} items
+            {WOMEN_PRODUCTS.length} items
           </span>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-10">
-          {PRODUCTS.map((product) => (
+          {WOMEN_PRODUCTS.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
         </div>

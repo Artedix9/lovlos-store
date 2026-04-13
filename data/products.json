@@ -1,0 +1,494 @@
+[
+  {
+    "id": "crop-top",
+    "name": "Crop Top",
+    "category": "Women",
+    "categoryHref": "/women",
+    "price": 85000,
+    "badge": "New",
+    "images": [
+      "/Crop-top 1a.png"
+    ],
+    "sizes": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "description": "A statement in simplicity. The LOVLOS Crop Top is cut with a clean, squared hem and a relaxed fit through the body — made from a breathable stretch fabric that moves with you from morning flow to city streets.",
+    "materials": "94% Polyamide, 6% Elastane. Fabric weight: 180 gsm. Quick-dry, four-way stretch.",
+    "care": "Machine wash cold. Do not tumble dry. Do not bleach or iron.",
+    "isComingSoon": false
+  },
+  {
+    "id": "relaxed-crop-top",
+    "name": "Relaxed Crop Top",
+    "category": "Women",
+    "categoryHref": "/women",
+    "price": 85000,
+    "images": [
+      "/Crop-top 2a.png"
+    ],
+    "sizes": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "description": "The softer take. Same clean crop, shaped for a slightly looser fit that layers effortlessly over high-waist bottoms or worn alone with confidence.",
+    "materials": "95% Cotton, 5% Elastane. Fabric weight: 160 gsm. Pre-washed for softness.",
+    "care": "Machine wash cold. Tumble dry low. Do not bleach.",
+    "isComingSoon": false
+  },
+  {
+    "id": "long-sleeve-crop-top",
+    "name": "Long Sleeve Crop Top",
+    "category": "Women",
+    "categoryHref": "/women",
+    "price": 98000,
+    "badge": "Best Seller",
+    "images": [
+      "/Crop-top Long-sleeves(W)a.png"
+    ],
+    "sizes": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "description": "For when the vibe calls for more. Long sleeves, cropped length — the balance of coverage and intention. Works in the studio, on the commute, and everywhere between.",
+    "materials": "92% Polyamide, 8% Elastane. Fabric weight: 200 gsm. Compression-lite fit.",
+    "care": "Machine wash cold. Do not tumble dry. Do not iron.",
+    "isComingSoon": false
+  },
+  {
+    "id": "long-sleeve-crop-top-black",
+    "name": "Long Sleeve Crop Top — Black",
+    "category": "Women",
+    "categoryHref": "/women",
+    "price": 98000,
+    "images": [
+      "/Crop-top Long-sleeves(B)a.png"
+    ],
+    "sizes": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "description": "The black iteration. Same compression-lite construction and cropped silhouette — worn in, layered over, or styled solo. The piece your wardrobe didn't know it needed.",
+    "materials": "92% Polyamide, 8% Elastane. Fabric weight: 200 gsm. Compression-lite fit.",
+    "care": "Machine wash cold. Do not tumble dry. Do not iron.",
+    "isComingSoon": false
+  },
+  {
+    "id": "ribbed-crop-vest",
+    "name": "Ribbed Crop Vest",
+    "category": "Women",
+    "categoryHref": "/women",
+    "price": 75000,
+    "badge": "New",
+    "images": [
+      "/Crop vest -a.png"
+    ],
+    "sizes": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "description": "Structure meets edge. Ribbed construction gives this vest its own texture and presence — the piece that elevates a look without trying.",
+    "materials": "60% Cotton, 35% Polyester, 5% Elastane. Ribbed knit construction.",
+    "care": "Machine wash cold. Lay flat to dry. Do not bleach.",
+    "isComingSoon": false
+  },
+  {
+    "id": "essential-crop-vest",
+    "name": "Essential Crop Vest",
+    "category": "Women",
+    "categoryHref": "/women",
+    "price": 75000,
+    "images": [
+      "/Crop vest 2-a.png"
+    ],
+    "sizes": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "description": "The everyday essential. Clean lines, minimal seaming, and a fit that works hard for every combination in your wardrobe.",
+    "materials": "96% Cotton, 4% Elastane. Jersey knit. Fabric weight: 140 gsm.",
+    "care": "Machine wash cold. Tumble dry low. Do not bleach.",
+    "isComingSoon": false
+  },
+  {
+    "id": "loose-crop-top",
+    "name": "Loose Crop Top",
+    "category": "Women",
+    "categoryHref": "/women",
+    "price": 90000,
+    "images": [
+      "/Loose Crop Top (B)a.png"
+    ],
+    "sizes": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "description": "Oversized crop energy — worn loose and intentional. Drop shoulders and a boxy hem make this the easiest piece to reach for every single day.",
+    "materials": "100% Organic Cotton. Fabric weight: 220 gsm. Garment-dyed.",
+    "care": "Machine wash cold. Tumble dry low. Expect slight colour variation — part of the character.",
+    "isComingSoon": false
+  },
+  {
+    "id": "sports-crop-top",
+    "name": "Sports Crop Top",
+    "category": "Women",
+    "categoryHref": "/women",
+    "price": 80000,
+    "images": [
+      "/Crop top sports.png"
+    ],
+    "sizes": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "description": "High-performance meets high-style. Built for movement — the LOVLOS Sports Crop Top features bonded seams and a supportive fit engineered for your most demanding sessions.",
+    "materials": "88% Polyamide, 12% Elastane. Fabric weight: 220 gsm. Four-way stretch. Moisture-wicking.",
+    "care": "Machine wash cold. Do not tumble dry. Do not bleach or iron.",
+    "isComingSoon": false
+  },
+  {
+    "id": "essential-slip-dress",
+    "name": "Essential Slip Dress",
+    "category": "Women",
+    "categoryHref": "/women",
+    "price": 165000,
+    "badge": "New",
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=900&q=85",
+      "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=900&q=85",
+      "https://images.unsplash.com/photo-1469334031218-e382a71b716b?auto=format&fit=crop&w=900&q=85"
+    ],
+    "sizes": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "description": "The Essential Slip Dress is cut from a whisper-light fabric that drapes effortlessly against the body. A bias-cut silhouette creates natural movement with every step — designed for the woman who dresses with intention. Wear it as a standalone piece or layer it over a relaxed tee for a studio-to-street look.",
+    "materials": "93% LENZING™ ECOVERO™ Viscose, 7% Elastane. Fabric weight: 130 gsm. OEKO-TEX® certified. Lining: 100% Recycled Polyester.",
+    "care": "Machine wash cold on delicate cycle. Do not tumble dry. Lay flat to dry. Cool iron if needed. Do not bleach.",
+    "isComingSoon": true
+  },
+  {
+    "id": "fluid-wide-leg-trousers",
+    "name": "Fluid Wide-Leg Trousers",
+    "category": "Women",
+    "categoryHref": "/women",
+    "price": 145000,
+    "images": [
+      "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=900&q=85",
+      "https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=900&q=85",
+      "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=900&q=85"
+    ],
+    "sizes": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "description": "Relaxed through the hip and dramatically wide at the hem. These trousers are finished with a clean, elasticated waistband and deep side pockets — the silhouette that makes everything look intentional. Cut from a fabric that moves like water.",
+    "materials": "100% TENCEL™ Lyocell. Fabric weight: 160 gsm. OEKO-TEX® certified.",
+    "care": "Hand wash or machine wash cold. Do not tumble dry. Iron on low heat.",
+    "isComingSoon": true
+  },
+  {
+    "id": "silk-midi-skirt",
+    "name": "Silk Midi Skirt",
+    "category": "Women",
+    "categoryHref": "/women",
+    "price": 175000,
+    "images": [
+      "https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?auto=format&fit=crop&w=900&q=85"
+    ],
+    "sizes": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "description": "Something beautiful is on its way. The Silk Midi Skirt is almost here.",
+    "materials": "Details to follow.",
+    "care": "Details to follow.",
+    "isComingSoon": true
+  },
+  {
+    "id": "ribbed-bodysuit",
+    "name": "Ribbed Bodysuit",
+    "category": "Women",
+    "categoryHref": "/women",
+    "price": 95000,
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=900&q=85"
+    ],
+    "sizes": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "description": "Something beautiful is on its way. The Ribbed Bodysuit is almost here.",
+    "materials": "Details to follow.",
+    "care": "Details to follow.",
+    "isComingSoon": true
+  },
+  {
+    "id": "studio-leggings",
+    "name": "Studio Leggings",
+    "category": "Women",
+    "categoryHref": "/women",
+    "price": 115000,
+    "images": [
+      "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=900&q=85"
+    ],
+    "sizes": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "description": "Something beautiful is on its way. The Studio Leggings are almost here.",
+    "materials": "Details to follow.",
+    "care": "Details to follow.",
+    "isComingSoon": true
+  },
+  {
+    "id": "essential-tee",
+    "name": "Oversize Tee",
+    "category": "Men",
+    "categoryHref": "/men",
+    "price": 75000,
+    "badge": "Best Seller",
+    "images": [
+      "/Oversize Tee (alo) front-a.png",
+      "/Oversize Tee (alo) front-bpng.png",
+      "/Oversize Tee (alo) front-c.png",
+      "/Oversize Tee (alo)back.png"
+    ],
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL"
+    ],
+    "description": "The benchmark of a clean wardrobe. Slightly boxy through the chest with a relaxed hem drop, the Oversize Tee is built from a mid-weight pique cotton that holds its shape wash after wash. A timeless piece engineered to outlast trends.",
+    "materials": "100% Supima Cotton. Fabric weight: 200 gsm. Pre-washed for a lived-in feel from day one.",
+    "care": "Machine wash cold. Tumble dry low. Do not iron directly on print.",
+    "isComingSoon": false
+  },
+  {
+    "id": "knitted-shirt",
+    "name": "Knitted Shirt",
+    "category": "Men",
+    "categoryHref": "/men",
+    "price": 125000,
+    "images": [
+      "/knitted shirt.png"
+    ],
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "description": "Refined texture, relaxed intention. The LOVLOS Knitted Shirt is constructed from a fine open-knit fabric with a clean collar and an easy, unfussy fit — the shirt that makes everything else in your wardrobe look better.",
+    "materials": "100% Cotton. Open-knit construction. Fabric weight: 180 gsm.",
+    "care": "Hand wash cold. Lay flat to dry. Do not tumble dry or bleach.",
+    "isComingSoon": false
+  },
+  {
+    "id": "slim-shorts",
+    "name": "Slim Shorts",
+    "category": "Men",
+    "categoryHref": "/men",
+    "price": 89000,
+    "images": [
+      "https://images.unsplash.com/photo-1485125639709-a60c3a500bf1?auto=format&fit=crop&w=900&q=85"
+    ],
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "description": "A modern short with a tailored edge. The Slim Shorts sit at the natural waist with a clean, structured hem — athletic lineage with a refined finish. From the gym to the city without changing.",
+    "materials": "87% Polyester, 13% Elastane. Fabric weight: 200 gsm. Four-way stretch.",
+    "care": "Machine wash cold. Tumble dry low. Do not bleach.",
+    "isComingSoon": true
+  },
+  {
+    "id": "linen-overshirt",
+    "name": "Linen Overshirt",
+    "category": "Men",
+    "categoryHref": "/men",
+    "price": 165000,
+    "badge": "New",
+    "images": [
+      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=900&q=85"
+    ],
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "description": "Layer it, leave it open, live in it. The LOVLOS Linen Overshirt is cut with a relaxed body and drop shoulders — the kind of piece that gets better with every wear. The only shirt you need this season.",
+    "materials": "100% Washed Linen. Fabric weight: 160 gsm.",
+    "care": "Machine wash cold or hand wash. Do not tumble dry. Iron on medium heat while slightly damp.",
+    "isComingSoon": true
+  },
+  {
+    "id": "performance-hoodie",
+    "name": "Performance Hoodie",
+    "category": "Men",
+    "categoryHref": "/men",
+    "price": 185000,
+    "images": [
+      "https://images.unsplash.com/photo-1564557287817-3785e38ec1f5?q=80&w=2948&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+    ],
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL"
+    ],
+    "description": "Warmth without compromise. The Performance Hoodie is engineered for maximum comfort and athletic movement — a midlayer that lives at the intersection of function and form. The fleece-lined interior keeps you comfortable on every level.",
+    "materials": "60% Cotton, 40% Polyester. French terry construction. Fabric weight: 320 gsm. Brushed interior.",
+    "care": "Machine wash cold. Tumble dry low. Do not bleach.",
+    "isComingSoon": true
+  },
+  {
+    "id": "classic-polo",
+    "name": "Classic Polo",
+    "category": "Men",
+    "categoryHref": "/men",
+    "price": 95000,
+    "images": [
+      "https://images.unsplash.com/photo-1537832816519-689ad163238b?auto=format&fit=crop&w=900&q=85"
+    ],
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "description": "The polo, reinvented for the LOVLOS wardrobe. A clean pique construction, refined collar, and a fit that sits exactly where it should — neither too relaxed nor too structured. The shirt you'll reach for without thinking.",
+    "materials": "100% Supima Cotton pique. Fabric weight: 210 gsm.",
+    "care": "Machine wash cold. Tumble dry low. Do not iron on collar.",
+    "isComingSoon": true
+  },
+  {
+    "id": "merino-crewneck",
+    "name": "Merino Crewneck",
+    "category": "Men",
+    "categoryHref": "/men",
+    "price": 195000,
+    "badge": "New",
+    "images": [
+      "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=900&q=85",
+      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=900&q=85",
+      "https://images.unsplash.com/photo-1485125639709-a60c3a500bf1?auto=format&fit=crop&w=900&q=85"
+    ],
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "description": "A fine-gauge Merino crewneck knitted to a relaxed but structured fit. Temperature-regulating and naturally odour-resistant — perfectly suited for Dar es Salaam evenings and cool highland mornings. The ribbed collar and cuffs offer a clean finish that pairs with everything.",
+    "materials": "100% Extra-Fine Merino Wool (17.5 micron). ZQ Merino certified. Knit weight: 12-gauge.",
+    "care": "Hand wash in cool water with wool detergent. Lay flat to dry. Do not tumble dry or bleach.",
+    "isComingSoon": true
+  },
+  {
+    "id": "cargo-pants",
+    "name": "Cargo Pants",
+    "category": "Men",
+    "categoryHref": "/men",
+    "price": 145000,
+    "images": [
+      "https://images.unsplash.com/photo-1542272604-787c3835535d?auto=format&fit=crop&w=900&q=85"
+    ],
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "description": "Something bold is on its way. The LOVLOS Cargo Pants are almost here.",
+    "materials": "Details to follow.",
+    "care": "Details to follow.",
+    "isComingSoon": true
+  },
+  {
+    "id": "track-jacket",
+    "name": "Track Jacket",
+    "category": "Men",
+    "categoryHref": "/men",
+    "price": 195000,
+    "images": [
+      "https://images.unsplash.com/photo-1544441893-675973e31985?auto=format&fit=crop&w=900&q=85"
+    ],
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL"
+    ],
+    "description": "Something bold is on its way. The LOVLOS Track Jacket is almost here.",
+    "materials": "Details to follow.",
+    "care": "Details to follow.",
+    "isComingSoon": true
+  },
+  {
+    "id": "canvas-tote",
+    "name": "Canvas Tote Bag",
+    "category": "Accessories",
+    "categoryHref": "/accessories",
+    "price": 65000,
+    "badge": "New",
+    "images": [
+      "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=900&q=85",
+      "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=900&q=85",
+      "https://images.unsplash.com/photo-1544441893-675973e31985?auto=format&fit=crop&w=900&q=85"
+    ],
+    "sizes": [
+      "One Size"
+    ],
+    "description": "The LOVLOS Canvas Tote is crafted from heavyweight washed canvas with a structured base that keeps its shape even when fully loaded. Reinforced handles and an interior zip pocket make this the bag you reach for every day.",
+    "materials": "Exterior: 100% Washed Canvas (600g). Interior lining: 100% Recycled Polyester. Hardware: Brushed brass.",
+    "care": "Spot clean with a damp cloth. Do not machine wash. Store in dust bag when not in use.",
+    "isComingSoon": false
+  }
+]

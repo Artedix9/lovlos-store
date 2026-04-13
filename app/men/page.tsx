@@ -3,55 +3,26 @@ import Link from "next/link";
 import Image from "next/image";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import ProductCard, { type Product } from "@/components/ProductCard";
+import ProductCard from "@/components/ProductCard";
+import { PRODUCTS } from "@/lib/products";
+import type { Product } from "@/components/ProductCard";
 
 export const metadata: Metadata = {
   title: "Men — LOVLOS",
   description: "Explore the LOVLOS men's collection. Clean, minimal essentials built for modern life.",
 };
 
-const PRODUCTS: Product[] = [
-  {
-    id: "m1", name: "Oversize Tee", price: 75000,
-    href: "/product/essential-tee", badge: "Best Seller",
-    image: "/Oversize Tee (alo) front-a.png",
-  },
-  {
-    id: "m2", name: "Oversize Tee — Alt", price: 75000,
-    href: "/product/essential-tee",
-    image: "/Oversize Tee (alo) front-bpng.png",
-  },
-  {
-    id: "m3", name: "Oversize Tee — Back", price: 75000,
-    href: "/product/essential-tee", badge: "New",
-    image: "/Oversize Tee (alo) front-c.png",
-  },
-  {
-    id: "m4", name: "Knitted Shirt", price: 125000,
-    href: "/product/knitted-shirt",
-    image: "/knitted shirt.png",
-  },
-  {
-    id: "m5", name: "Slim Shorts", price: 89000,
-    href: "/product/slim-shorts",
-    image: "https://images.unsplash.com/photo-1485125639709-a60c3a500bf1?auto=format&fit=crop&w=600&q=80",
-  },
-  {
-    id: "m6", name: "Linen Overshirt", price: 165000,
-    href: "/product/linen-overshirt", badge: "New",
-    image: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=600&q=80",
-  },
-  {
-    id: "m7", name: "Performance Hoodie", price: 185000,
-    href: "/product/performance-hoodie",
-    image: "https://images.unsplash.com/photo-1556821840-3a63f15732ce?auto=format&fit=crop&w=600&q=80",
-  },
-  {
-    id: "m8", name: "Classic Polo", price: 95000,
-    href: "/product/classic-polo",
-    image: "https://images.unsplash.com/photo-1537832816519-689ad163238b?auto=format&fit=crop&w=600&q=80",
-  },
-];
+const MEN_PRODUCTS: Product[] = PRODUCTS
+  .filter((p) => p.category === "Men")
+  .map((p) => ({
+    id: p.id,
+    name: p.name,
+    price: p.price,
+    href: `/product/${p.id}`,
+    badge: p.badge,
+    image: p.images[0],
+    isComingSoon: p.isComingSoon,
+  }));
 
 const CATEGORIES = [
   {
@@ -79,7 +50,6 @@ export default function MenPage() {
 
       {/* ── Hero Banner ── */}
       <section className="relative w-full h-[70vh] min-h-[480px] overflow-hidden">
-        {/* Hero background image */}
         <Image
           src="https://images.unsplash.com/photo-1483058712412-4245e9b90334?auto=format&fit=crop&w=1800&q=85"
           alt="Men's collection hero"
@@ -88,7 +58,6 @@ export default function MenPage() {
           className="object-cover object-center"
           sizes="100vw"
         />
-        {/* Darker overlay — suits the streetwear mood */}
         <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent" />
 
         <div className="relative flex flex-col justify-end h-full pb-10 md:pb-16 px-5 md:px-16 lg:px-24">
@@ -112,12 +81,12 @@ export default function MenPage() {
         <div className="flex items-baseline justify-between mb-10">
           <h2 className="font-display text-3xl font-bold uppercase tracking-tight">New Arrivals</h2>
           <span className="text-xs tracking-widest uppercase text-chicago">
-            {PRODUCTS.length} items
+            {MEN_PRODUCTS.length} items
           </span>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-10">
-          {PRODUCTS.map((product) => (
+          {MEN_PRODUCTS.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
         </div>
