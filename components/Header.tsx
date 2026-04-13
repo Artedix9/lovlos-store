@@ -133,6 +133,7 @@ const NAV_LEFT = [
 ];
 
 const NAV_RIGHT = [
+  { label: "Studio", href: "/studio" },
   { label: "About", href: "/about" },
 ];
 
@@ -141,6 +142,7 @@ const MOBILE_NAV = [
   { label: "Women", href: "/women" },
   { label: "Men", href: "/men" },
   { label: "Accessories", href: "/accessories" },
+  { label: "Studio", href: "/studio" },
   { label: "About", href: "/about" },
 ];
 

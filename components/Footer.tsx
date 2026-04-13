@@ -8,6 +8,7 @@ const COLUMNS = [
     heading: "Company",
     links: [
       { label: "About LOVLOS", href: "/about" },
+      { label: "Studio", href: "/studio" },
       { label: "Sustainability", href: "/sustainability" },
       { label: "Press", href: "/press" },
       { label: "Careers", href: "/careers" },
