@@ -41,7 +41,7 @@ interface FormErrors {
   email?: string;
 }
 
-/* ── Onyx-themed input wrapper ── */
+/* ── Field wrapper ── */
 function Field({
   label,
   error,
@@ -53,12 +53,12 @@ function Field({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <label className="text-[10px] font-bold tracking-ultra uppercase text-zinc-400">
+      <label className="text-[10px] font-bold tracking-ultra uppercase text-zinc-600">
         {label}
       </label>
       {children}
       {error && (
-        <p className="text-[11px] text-red-400 tracking-wide">{error}</p>
+        <p className="text-[11px] text-red-500 tracking-wide">{error}</p>
       )}
     </div>
   );
@@ -66,11 +66,11 @@ function Field({
 
 const inputCls = (hasError?: string) =>
   [
-    "w-full bg-zinc-900 border text-sm text-white px-4 py-3.5 outline-none",
-    "placeholder:text-zinc-600 tracking-wide transition-colors duration-200",
+    "w-full bg-white border text-sm text-zinc-900 px-4 py-3.5 outline-none",
+    "placeholder:text-zinc-400 tracking-wide transition-all duration-200",
     hasError
-      ? "border-red-500 focus:border-red-400"
-      : "border-white/10 focus:border-white/40",
+      ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+      : "border-zinc-900 focus:border-zinc-700 focus:ring-2 focus:ring-zinc-900/10",
   ].join(" ");
 
 export default function CheckoutPage() {
@@ -171,9 +171,9 @@ export default function CheckoutPage() {
     return (
       <>
         <Header />
-        <main className="min-h-[60vh] flex flex-col items-center justify-center gap-4 px-6 text-center">
-          <p className="text-xs font-bold uppercase tracking-ultra text-chicago">Your bag is empty</p>
-          <h1 className="font-sans text-3xl font-black uppercase tracking-tight">Nothing to check out</h1>
+        <main className="min-h-[60vh] flex flex-col items-center justify-center gap-4 px-6 text-center bg-white">
+          <p className="text-xs font-bold uppercase tracking-ultra text-zinc-500">Your bag is empty</p>
+          <h1 className="font-sans text-3xl font-black uppercase tracking-tight text-zinc-950">Nothing to check out</h1>
           <Link href="/" className="btn-primary mt-4">Continue Shopping</Link>
         </main>
         <Footer />
@@ -185,7 +185,7 @@ export default function CheckoutPage() {
     <>
       <Header />
 
-      <main className="min-h-screen bg-zinc-950">
+      <main className="min-h-screen bg-[#FDFDFD]">
         <div className="max-w-7xl mx-auto px-6 md:px-10 lg:px-16 py-14">
 
           {/* Page title */}
@@ -193,7 +193,7 @@ export default function CheckoutPage() {
             <p className="text-[10px] tracking-ultra uppercase text-zinc-500 font-sans mb-2">
               Almost there
             </p>
-            <h1 className="font-display text-3xl md:text-4xl font-black uppercase tracking-tighter text-white">
+            <h1 className="font-display text-3xl md:text-4xl font-black uppercase tracking-tighter text-zinc-950">
               Checkout
             </h1>
           </div>
@@ -208,7 +208,7 @@ export default function CheckoutPage() {
 
               {/* Delivery Info */}
               <section>
-                <h2 className="text-xs font-black uppercase tracking-ultra text-white mb-6 pb-3 border-b border-white/10">
+                <h2 className="text-xs font-black uppercase tracking-ultra text-zinc-950 mb-6 pb-3 border-b border-zinc-200">
                   Delivery Information
                 </h2>
 
@@ -254,7 +254,7 @@ export default function CheckoutPage() {
                       name="city"
                       value={form.city}
                       onChange={handleChange}
-                      className="w-full bg-zinc-900 border border-white/10 text-sm text-white px-4 py-3.5 outline-none focus:border-white/40 transition-colors duration-200 cursor-pointer appearance-none"
+                      className="w-full bg-white border border-zinc-900 text-sm text-zinc-900 px-4 py-3.5 outline-none focus:border-zinc-700 focus:ring-2 focus:ring-zinc-900/10 transition-all duration-200 cursor-pointer appearance-none"
                     >
                       {CITIES.map((c) => (
                         <option key={c} value={c}>{c}</option>
@@ -269,7 +269,7 @@ export default function CheckoutPage() {
                       onChange={handleChange}
                       rows={3}
                       placeholder="Landmark, building name, gate colour…"
-                      className="w-full bg-zinc-900 border border-white/10 text-sm text-white px-4 py-3.5 outline-none focus:border-white/40 transition-colors duration-200 placeholder:text-zinc-600 resize-none tracking-wide"
+                      className="w-full bg-white border border-zinc-900 text-sm text-zinc-900 px-4 py-3.5 outline-none focus:border-zinc-700 focus:ring-2 focus:ring-zinc-900/10 transition-all duration-200 placeholder:text-zinc-400 resize-none tracking-wide"
                     />
                   </Field>
                 </div>
@@ -277,7 +277,7 @@ export default function CheckoutPage() {
 
               {/* Payment Method */}
               <section>
-                <h2 className="text-xs font-black uppercase tracking-ultra text-white mb-6 pb-3 border-b border-white/10">
+                <h2 className="text-xs font-black uppercase tracking-ultra text-zinc-950 mb-6 pb-3 border-b border-zinc-200">
                   Payment Method
                 </h2>
 
@@ -299,8 +299,8 @@ export default function CheckoutPage() {
                       className={[
                         "flex items-start gap-4 p-4 border cursor-pointer transition-colors duration-150",
                         form.payment === option.value
-                          ? "border-white/40 bg-white/5"
-                          : "border-white/10 hover:border-white/25",
+                          ? "border-zinc-900 bg-zinc-50"
+                          : "border-zinc-200 hover:border-zinc-400",
                       ].join(" ")}
                     >
                       <input
@@ -309,10 +309,10 @@ export default function CheckoutPage() {
                         value={option.value}
                         checked={form.payment === option.value}
                         onChange={handleChange}
-                        className="mt-0.5 accent-white shrink-0"
+                        className="mt-0.5 accent-zinc-900 shrink-0"
                       />
                       <div>
-                        <p className="text-sm font-bold uppercase tracking-tight text-white">
+                        <p className="text-sm font-bold uppercase tracking-tight text-zinc-950">
                           {option.label}
                         </p>
                         <p className="text-xs text-zinc-500 tracking-wide mt-0.5">
@@ -324,8 +324,8 @@ export default function CheckoutPage() {
                 </div>
 
                 {form.payment === "mobile-money" && (
-                  <div className="mt-4 border border-white/10 bg-white/5 px-4 py-3">
-                    <p className="text-xs text-zinc-400 tracking-wide leading-relaxed">
+                  <div className="mt-4 border border-zinc-200 bg-zinc-50 px-4 py-3">
+                    <p className="text-xs text-zinc-600 tracking-wide leading-relaxed">
                       After placing your order, WhatsApp will open with your full invoice. Send your payment screenshot to confirm.
                     </p>
                   </div>
@@ -334,7 +334,7 @@ export default function CheckoutPage() {
 
               {/* API error */}
               {apiError && (
-                <p className="text-sm text-red-400 tracking-wide border border-red-500/30 bg-red-500/10 px-4 py-3">
+                <p className="text-sm text-red-600 tracking-wide border border-red-300 bg-red-50 px-4 py-3">
                   {apiError}
                 </p>
               )}
@@ -346,16 +346,16 @@ export default function CheckoutPage() {
             </div>
 
             {/* ══ RIGHT — Order Summary ══ */}
-            <div className="lg:sticky lg:top-24 space-y-0">
-              <h2 className="text-xs font-black uppercase tracking-ultra text-white mb-6 pb-3 border-b border-white/10">
+            <div className="lg:sticky lg:top-24 space-y-0 bg-zinc-50 p-6">
+              <h2 className="text-xs font-black uppercase tracking-ultra text-zinc-950 mb-6 pb-3 border-b border-zinc-200">
                 Order Summary
               </h2>
 
               {/* Items */}
-              <ul className="divide-y divide-white/[0.06]">
+              <ul className="divide-y divide-zinc-100">
                 {items.map((item) => (
                   <li key={`${item.id}-${item.size}`} className="flex gap-4 py-4">
-                    <div className="relative w-16 h-20 shrink-0 bg-zinc-800 overflow-hidden">
+                    <div className="relative w-16 h-20 shrink-0 bg-zinc-100 overflow-hidden">
                       <Image
                         src={item.image}
                         alt={item.name}
@@ -363,19 +363,19 @@ export default function CheckoutPage() {
                         sizes="64px"
                         className="object-cover object-top"
                       />
-                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-white text-zinc-950 text-[10px] flex items-center justify-center rounded-full leading-none font-bold">
+                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-zinc-950 text-white text-[10px] flex items-center justify-center rounded-full leading-none font-bold">
                         {item.quantity}
                       </span>
                     </div>
                     <div className="flex-1 flex flex-col justify-center gap-1 min-w-0">
-                      <p className="text-xs font-bold uppercase tracking-tight truncate text-zinc-100">
+                      <p className="text-xs font-bold uppercase tracking-tight truncate text-zinc-900">
                         {item.name}
                       </p>
                       <p className="text-[10px] tracking-widest uppercase text-zinc-500">
                         Size: {item.size}
                       </p>
                     </div>
-                    <p className="text-sm text-zinc-300 shrink-0 self-center">
+                    <p className="text-sm text-zinc-700 shrink-0 self-center">
                       {formatTZS(item.price * item.quantity)}
                     </p>
                   </li>
@@ -383,22 +383,22 @@ export default function CheckoutPage() {
               </ul>
 
               {/* Totals */}
-              <div className="pt-4 space-y-3 border-t border-white/[0.06]">
+              <div className="pt-4 space-y-3 border-t border-zinc-200">
                 <div className="flex justify-between text-sm">
                   <span className="text-zinc-500 tracking-wide">Subtotal</span>
-                  <span className="text-zinc-300">{formatTZS(subtotal)}</span>
+                  <span className="text-zinc-700">{formatTZS(subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-zinc-500 tracking-wide">Delivery</span>
-                  <span className="text-zinc-300">
+                  <span className="text-zinc-700">
                     {deliveryFee === 0 ? (
-                      <span className="text-green-400 font-bold tracking-wide">Free</span>
+                      <span className="text-green-600 font-bold tracking-wide">Free</span>
                     ) : (
                       formatTZS(deliveryFee)
                     )}
                   </span>
                 </div>
-                <div className="flex justify-between text-base font-black uppercase tracking-tight pt-2 border-t border-white/10 text-white">
+                <div className="flex justify-between text-base font-black uppercase tracking-tight pt-2 border-t border-zinc-200 text-zinc-950">
                   <span>Total</span>
                   <span>{formatTZS(total)}</span>
                 </div>
@@ -409,7 +409,7 @@ export default function CheckoutPage() {
                 <PlaceOrderButton placing={placing} />
               </div>
 
-              <p className="text-[10px] tracking-widest uppercase text-zinc-600 text-center pt-3">
+              <p className="text-[10px] tracking-widest uppercase text-zinc-400 text-center pt-3">
                 Secure · No card required
               </p>
             </div>
@@ -427,9 +427,9 @@ function PlaceOrderButton({ placing }: { placing: boolean }) {
     <button
       type="submit"
       disabled={placing}
-      className="w-full bg-white text-zinc-950 text-xs font-black tracking-ultra uppercase py-4 hover:bg-zinc-100 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+      className="w-full bg-zinc-950 text-white text-xs font-black tracking-[0.15em] uppercase py-6 px-8 flex items-center justify-center hover:bg-zinc-800 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
     >
-      {placing ? "Saving Order…" : "Place Order & Open WhatsApp →"}
+      {placing ? "Placing Order…" : "Place Order"}
     </button>
   );
 }
