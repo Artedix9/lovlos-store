@@ -8,23 +8,29 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useCart } from "@/context/CartContext";
 import { formatTZS } from "@/lib/products";
+import { buildWhatsAppUrl } from "@/lib/orders";
+import type { OrderPayload, SavedOrder } from "@/lib/orders";
 
-const REGIONS = [
-  { value: "dar-es-salaam", label: "Dar es Salaam" },
-  { value: "arusha",        label: "Arusha" },
-  { value: "mwanza",        label: "Mwanza" },
-  { value: "dodoma",        label: "Dodoma" },
-  { value: "zanzibar",      label: "Zanzibar" },
-  { value: "other",         label: "Other" },
+const CITIES = [
+  "Dar es Salaam",
+  "Arusha",
+  "Mwanza",
+  "Dodoma",
+  "Zanzibar",
+  "Mbeya",
+  "Tanga",
+  "Morogoro",
+  "Other",
 ];
 
-const DELIVERY_FEE = 5000; // TZS — waived above 150,000
+const DELIVERY_FEE = 5000;
 const FREE_DELIVERY_THRESHOLD = 150000;
 
 interface FormState {
   name: string;
   phone: string;
-  region: string;
+  email: string;
+  city: string;
   note: string;
   payment: "mobile-money" | "cash-on-delivery";
 }
@@ -32,9 +38,11 @@ interface FormState {
 interface FormErrors {
   name?: string;
   phone?: string;
+  email?: string;
 }
 
-function InputField({
+/* ── Onyx-themed input wrapper ── */
+function Field({
   label,
   error,
   children,
@@ -44,17 +52,26 @@ function InputField({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-[10px] tracking-widest uppercase text-chicago">
+    <div className="flex flex-col gap-2">
+      <label className="text-[10px] font-bold tracking-ultra uppercase text-zinc-400">
         {label}
       </label>
       {children}
       {error && (
-        <p className="text-[11px] text-[#b00020] tracking-wide">{error}</p>
+        <p className="text-[11px] text-red-400 tracking-wide">{error}</p>
       )}
     </div>
   );
 }
+
+const inputCls = (hasError?: string) =>
+  [
+    "w-full bg-zinc-900 border text-sm text-white px-4 py-3.5 outline-none",
+    "placeholder:text-zinc-600 tracking-wide transition-colors duration-200",
+    hasError
+      ? "border-red-500 focus:border-red-400"
+      : "border-white/10 focus:border-white/40",
+  ].join(" ");
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -63,12 +80,14 @@ export default function CheckoutPage() {
   const [form, setForm] = useState<FormState>({
     name: "",
     phone: "",
-    region: "dar-es-salaam",
+    email: "",
+    city: "Dar es Salaam",
     note: "",
     payment: "mobile-money",
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [placing, setPlacing] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const deliveryFee = subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE;
   const total = subtotal + deliveryFee;
@@ -80,6 +99,9 @@ export default function CheckoutPage() {
       next.phone = "Phone number is required.";
     } else if (!/^(\+255|0)[67]\d{8}$/.test(form.phone.replace(/\s/g, ""))) {
       next.phone = "Enter a valid Tanzanian number (e.g. 0746 704 036).";
+    }
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      next.email = "Enter a valid email address.";
     }
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -93,21 +115,55 @@ export default function CheckoutPage() {
     if (errors[name as keyof FormErrors]) {
       setErrors((prev) => ({ ...prev, [name]: undefined }));
     }
+    if (apiError) setApiError(null);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!validate()) return;
     setPlacing(true);
-    /* Simulate async order recording — replace with real API call */
-    await new Promise((r) => setTimeout(r, 600));
-    clearCart();
-    closeCart();
-    router.push(
-      `/success?total=${total}&payment=${form.payment}&region=${encodeURIComponent(
-        REGIONS.find((r) => r.value === form.region)?.label ?? form.region
-      )}`
-    );
+    setApiError(null);
+
+    const payload: OrderPayload = {
+      customer_name: form.name.trim(),
+      phone: form.phone.trim(),
+      email: form.email.trim(),
+      city: form.city,
+      delivery_note: form.note.trim(),
+      payment_method: form.payment,
+      items,
+      subtotal,
+      delivery_fee: deliveryFee,
+      total,
+    };
+
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Something went wrong. Please try again.");
+      }
+
+      const { order }: { order: SavedOrder } = await res.json();
+
+      /* Open WhatsApp in a new tab with the full invoice message */
+      window.open(buildWhatsAppUrl(order), "_blank", "noopener,noreferrer");
+
+      clearCart();
+      closeCart();
+
+      router.push(
+        `/success?total=${total}&payment=${form.payment}&region=${encodeURIComponent(form.city)}&orderId=${order.id}`
+      );
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : "Something went wrong.");
+      setPlacing(false);
+    }
   }
 
   /* ── Empty cart guard ── */
@@ -129,214 +185,236 @@ export default function CheckoutPage() {
     <>
       <Header />
 
-      <main className="max-w-7xl mx-auto px-6 md:px-10 lg:px-16 py-14">
+      <main className="min-h-screen bg-zinc-950">
+        <div className="max-w-7xl mx-auto px-6 md:px-10 lg:px-16 py-14">
 
-        {/* Page title */}
-        <h1 className="font-sans text-2xl font-black uppercase tracking-tight mb-10">
-          Checkout
-        </h1>
-
-        <form
-          onSubmit={handleSubmit}
-          noValidate
-          className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-10 lg:gap-16 items-start"
-        >
-          {/* ══ LEFT — Delivery & Payment ══ */}
-          <div className="space-y-10">
-
-            {/* Delivery Info */}
-            <section>
-              <h2 className="text-xs font-bold uppercase tracking-ultra text-primary mb-6 pb-3 border-b border-mercury">
-                Delivery Information
-              </h2>
-
-              <div className="space-y-5">
-                <InputField label="Full Name *" error={errors.name}>
-                  <input
-                    type="text"
-                    name="name"
-                    value={form.name}
-                    onChange={handleChange}
-                    autoComplete="name"
-                    placeholder="e.g. Amara Osei"
-                    className={[
-                      "border text-sm px-4 py-3 w-full outline-none transition-colors duration-200 bg-white",
-                      errors.name ? "border-[#b00020]" : "border-mercury focus:border-primary",
-                    ].join(" ")}
-                  />
-                </InputField>
-
-                <InputField label="Phone Number *" error={errors.phone}>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={form.phone}
-                    onChange={handleChange}
-                    autoComplete="tel"
-                    placeholder="+255 746 704 036"
-                    className={[
-                      "border text-sm px-4 py-3 w-full outline-none transition-colors duration-200 bg-white",
-                      errors.phone ? "border-[#b00020]" : "border-mercury focus:border-primary",
-                    ].join(" ")}
-                  />
-                </InputField>
-
-                <InputField label="Region">
-                  <select
-                    name="region"
-                    value={form.region}
-                    onChange={handleChange}
-                    className="border border-mercury text-sm px-4 py-3 w-full outline-none focus:border-primary transition-colors duration-200 bg-white appearance-none cursor-pointer"
-                  >
-                    {REGIONS.map((r) => (
-                      <option key={r.value} value={r.value}>{r.label}</option>
-                    ))}
-                  </select>
-                </InputField>
-
-                <InputField label="Delivery Note (optional)">
-                  <textarea
-                    name="note"
-                    value={form.note}
-                    onChange={handleChange}
-                    rows={3}
-                    placeholder="Landmark, building name, gate colour…"
-                    className="border border-mercury text-sm px-4 py-3 w-full outline-none focus:border-primary transition-colors duration-200 bg-white resize-none"
-                  />
-                </InputField>
-              </div>
-            </section>
-
-            {/* Payment Method */}
-            <section>
-              <h2 className="text-xs font-bold uppercase tracking-ultra text-primary mb-6 pb-3 border-b border-mercury">
-                Payment Method
-              </h2>
-
-              <div className="space-y-3">
-                {[
-                  {
-                    value: "mobile-money",
-                    label: "Mobile Money",
-                    sub: "M-Pesa · Tigo Pesa · Airtel Money",
-                  },
-                  {
-                    value: "cash-on-delivery",
-                    label: "Cash on Delivery",
-                    sub: "Pay when your order arrives",
-                  },
-                ].map((option) => (
-                  <label
-                    key={option.value}
-                    className={[
-                      "flex items-start gap-4 p-4 border cursor-pointer transition-colors duration-150",
-                      form.payment === option.value
-                        ? "border-primary bg-smoke"
-                        : "border-mercury hover:border-dawn",
-                    ].join(" ")}
-                  >
-                    <input
-                      type="radio"
-                      name="payment"
-                      value={option.value}
-                      checked={form.payment === option.value}
-                      onChange={handleChange}
-                      className="mt-0.5 accent-black shrink-0"
-                    />
-                    <div>
-                      <p className="text-sm font-bold uppercase tracking-tight text-primary">
-                        {option.label}
-                      </p>
-                      <p className="text-xs text-chicago tracking-wide mt-0.5">
-                        {option.sub}
-                      </p>
-                    </div>
-                  </label>
-                ))}
-              </div>
-
-              {form.payment === "mobile-money" && (
-                <div className="mt-4 bg-smoke border border-mercury px-4 py-3">
-                  <p className="text-xs text-mine tracking-wide leading-relaxed">
-                    After placing your order, you will be shown the M-Pesa payment details and a WhatsApp link to send your screenshot.
-                  </p>
-                </div>
-              )}
-            </section>
-
-            {/* Place Order — mobile CTA (shown below form on small screens, hidden on desktop) */}
-            <div className="lg:hidden">
-              <PlaceOrderButton placing={placing} />
-            </div>
+          {/* Page title */}
+          <div className="mb-10">
+            <p className="text-[10px] tracking-ultra uppercase text-zinc-500 font-sans mb-2">
+              Almost there
+            </p>
+            <h1 className="font-display text-3xl md:text-4xl font-black uppercase tracking-tighter text-white">
+              Checkout
+            </h1>
           </div>
 
-          {/* ══ RIGHT — Order Summary ══ */}
-          <div className="lg:sticky lg:top-24 space-y-0">
-            <h2 className="text-xs font-bold uppercase tracking-ultra text-primary mb-6 pb-3 border-b border-mercury">
-              Order Summary
-            </h2>
+          <form
+            onSubmit={handleSubmit}
+            noValidate
+            className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-10 lg:gap-16 items-start"
+          >
+            {/* ══ LEFT — Delivery & Payment ══ */}
+            <div className="space-y-10">
 
-            {/* Items */}
-            <ul className="divide-y divide-mercury">
-              {items.map((item) => (
-                <li key={`${item.id}-${item.size}`} className="flex gap-4 py-4">
-                  <div className="relative w-16 h-20 shrink-0 bg-smoke overflow-hidden">
-                    <Image
-                      src={item.image}
-                      alt={item.name}
-                      fill
-                      sizes="64px"
-                      className="object-cover object-top"
+              {/* Delivery Info */}
+              <section>
+                <h2 className="text-xs font-black uppercase tracking-ultra text-white mb-6 pb-3 border-b border-white/10">
+                  Delivery Information
+                </h2>
+
+                <div className="space-y-5">
+                  <Field label="Full Name *" error={errors.name}>
+                    <input
+                      type="text"
+                      name="name"
+                      value={form.name}
+                      onChange={handleChange}
+                      autoComplete="name"
+                      placeholder="e.g. Amara Osei"
+                      className={inputCls(errors.name)}
                     />
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-white text-[10px] flex items-center justify-center rounded-full leading-none">
-                      {item.quantity}
-                    </span>
-                  </div>
-                  <div className="flex-1 flex flex-col justify-center gap-1 min-w-0">
-                    <p className="text-xs font-bold uppercase tracking-tight truncate">{item.name}</p>
-                    <p className="text-[10px] tracking-widest uppercase text-chicago">
-                      Size: {item.size}
+                  </Field>
+
+                  <Field label="Phone Number *" error={errors.phone}>
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={form.phone}
+                      onChange={handleChange}
+                      autoComplete="tel"
+                      placeholder="+255 746 704 036"
+                      className={inputCls(errors.phone)}
+                    />
+                  </Field>
+
+                  <Field label="Email Address (optional)" error={errors.email}>
+                    <input
+                      type="email"
+                      name="email"
+                      value={form.email}
+                      onChange={handleChange}
+                      autoComplete="email"
+                      placeholder="you@example.com"
+                      className={inputCls(errors.email)}
+                    />
+                  </Field>
+
+                  <Field label="City / Delivery Area">
+                    <select
+                      name="city"
+                      value={form.city}
+                      onChange={handleChange}
+                      className="w-full bg-zinc-900 border border-white/10 text-sm text-white px-4 py-3.5 outline-none focus:border-white/40 transition-colors duration-200 cursor-pointer appearance-none"
+                    >
+                      {CITIES.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <Field label="Delivery Note (optional)">
+                    <textarea
+                      name="note"
+                      value={form.note}
+                      onChange={handleChange}
+                      rows={3}
+                      placeholder="Landmark, building name, gate colour…"
+                      className="w-full bg-zinc-900 border border-white/10 text-sm text-white px-4 py-3.5 outline-none focus:border-white/40 transition-colors duration-200 placeholder:text-zinc-600 resize-none tracking-wide"
+                    />
+                  </Field>
+                </div>
+              </section>
+
+              {/* Payment Method */}
+              <section>
+                <h2 className="text-xs font-black uppercase tracking-ultra text-white mb-6 pb-3 border-b border-white/10">
+                  Payment Method
+                </h2>
+
+                <div className="space-y-3">
+                  {[
+                    {
+                      value: "mobile-money",
+                      label: "Mobile Money",
+                      sub: "M-Pesa · Tigo Pesa · Airtel Money",
+                    },
+                    {
+                      value: "cash-on-delivery",
+                      label: "Cash on Delivery",
+                      sub: "Pay when your order arrives",
+                    },
+                  ].map((option) => (
+                    <label
+                      key={option.value}
+                      className={[
+                        "flex items-start gap-4 p-4 border cursor-pointer transition-colors duration-150",
+                        form.payment === option.value
+                          ? "border-white/40 bg-white/5"
+                          : "border-white/10 hover:border-white/25",
+                      ].join(" ")}
+                    >
+                      <input
+                        type="radio"
+                        name="payment"
+                        value={option.value}
+                        checked={form.payment === option.value}
+                        onChange={handleChange}
+                        className="mt-0.5 accent-white shrink-0"
+                      />
+                      <div>
+                        <p className="text-sm font-bold uppercase tracking-tight text-white">
+                          {option.label}
+                        </p>
+                        <p className="text-xs text-zinc-500 tracking-wide mt-0.5">
+                          {option.sub}
+                        </p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+
+                {form.payment === "mobile-money" && (
+                  <div className="mt-4 border border-white/10 bg-white/5 px-4 py-3">
+                    <p className="text-xs text-zinc-400 tracking-wide leading-relaxed">
+                      After placing your order, WhatsApp will open with your full invoice. Send your payment screenshot to confirm.
                     </p>
                   </div>
-                  <p className="text-sm text-primary shrink-0 self-center">
-                    {formatTZS(item.price * item.quantity)}
-                  </p>
-                </li>
-              ))}
-            </ul>
+                )}
+              </section>
 
-            {/* Totals */}
-            <div className="pt-4 space-y-3 border-t border-mercury">
-              <div className="flex justify-between text-sm">
-                <span className="text-chicago tracking-wide">Subtotal</span>
-                <span>{formatTZS(subtotal)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-chicago tracking-wide">Delivery</span>
-                <span>
-                  {deliveryFee === 0 ? (
-                    <span className="text-[#758e6d] font-bold tracking-wide">Free</span>
-                  ) : (
-                    formatTZS(deliveryFee)
-                  )}
-                </span>
-              </div>
-              <div className="flex justify-between text-base font-black uppercase tracking-tight pt-2 border-t border-mercury">
-                <span>Total</span>
-                <span>{formatTZS(total)}</span>
+              {/* API error */}
+              {apiError && (
+                <p className="text-sm text-red-400 tracking-wide border border-red-500/30 bg-red-500/10 px-4 py-3">
+                  {apiError}
+                </p>
+              )}
+
+              {/* Place Order — mobile */}
+              <div className="lg:hidden">
+                <PlaceOrderButton placing={placing} />
               </div>
             </div>
 
-            {/* Place Order — desktop CTA */}
-            <div className="hidden lg:block pt-6">
-              <PlaceOrderButton placing={placing} />
-            </div>
+            {/* ══ RIGHT — Order Summary ══ */}
+            <div className="lg:sticky lg:top-24 space-y-0">
+              <h2 className="text-xs font-black uppercase tracking-ultra text-white mb-6 pb-3 border-b border-white/10">
+                Order Summary
+              </h2>
 
-            <p className="text-[10px] tracking-widest uppercase text-dawn text-center pt-3">
-              Secure · No card required
-            </p>
-          </div>
-        </form>
+              {/* Items */}
+              <ul className="divide-y divide-white/[0.06]">
+                {items.map((item) => (
+                  <li key={`${item.id}-${item.size}`} className="flex gap-4 py-4">
+                    <div className="relative w-16 h-20 shrink-0 bg-zinc-800 overflow-hidden">
+                      <Image
+                        src={item.image}
+                        alt={item.name}
+                        fill
+                        sizes="64px"
+                        className="object-cover object-top"
+                      />
+                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-white text-zinc-950 text-[10px] flex items-center justify-center rounded-full leading-none font-bold">
+                        {item.quantity}
+                      </span>
+                    </div>
+                    <div className="flex-1 flex flex-col justify-center gap-1 min-w-0">
+                      <p className="text-xs font-bold uppercase tracking-tight truncate text-zinc-100">
+                        {item.name}
+                      </p>
+                      <p className="text-[10px] tracking-widest uppercase text-zinc-500">
+                        Size: {item.size}
+                      </p>
+                    </div>
+                    <p className="text-sm text-zinc-300 shrink-0 self-center">
+                      {formatTZS(item.price * item.quantity)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+
+              {/* Totals */}
+              <div className="pt-4 space-y-3 border-t border-white/[0.06]">
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-500 tracking-wide">Subtotal</span>
+                  <span className="text-zinc-300">{formatTZS(subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-500 tracking-wide">Delivery</span>
+                  <span className="text-zinc-300">
+                    {deliveryFee === 0 ? (
+                      <span className="text-green-400 font-bold tracking-wide">Free</span>
+                    ) : (
+                      formatTZS(deliveryFee)
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between text-base font-black uppercase tracking-tight pt-2 border-t border-white/10 text-white">
+                  <span>Total</span>
+                  <span>{formatTZS(total)}</span>
+                </div>
+              </div>
+
+              {/* Place Order — desktop */}
+              <div className="hidden lg:block pt-6">
+                <PlaceOrderButton placing={placing} />
+              </div>
+
+              <p className="text-[10px] tracking-widest uppercase text-zinc-600 text-center pt-3">
+                Secure · No card required
+              </p>
+            </div>
+          </form>
+        </div>
       </main>
 
       <Footer />
@@ -349,9 +427,9 @@ function PlaceOrderButton({ placing }: { placing: boolean }) {
     <button
       type="submit"
       disabled={placing}
-      className="w-full bg-zinc-950 text-white text-xs font-bold tracking-ultra uppercase py-4 hover:bg-zinc-800 transition-colors duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+      className="w-full bg-white text-zinc-950 text-xs font-black tracking-ultra uppercase py-4 hover:bg-zinc-100 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
     >
-      {placing ? "Placing Order…" : "Place Order →"}
+      {placing ? "Saving Order…" : "Place Order & Open WhatsApp →"}
     </button>
   );
 }

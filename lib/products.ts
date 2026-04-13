@@ -10,6 +10,7 @@ export interface PDPProduct {
   description: string;
   materials: string;
   care: string;
+  isComingSoon?: boolean;
 }
 
 export const PRODUCTS: Record<string, PDPProduct> = {

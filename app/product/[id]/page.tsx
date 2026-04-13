@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { AnimatePresence, motion } from "framer-motion";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { getProduct, formatTZS } from "@/lib/products";
 import { useCart } from "@/context/CartContext";
+import { useToast } from "@/context/ToastContext";
 
 /* ── Accordion item ── */
 function AccordionItem({
@@ -50,6 +52,81 @@ function AccordionItem({
   );
 }
 
+/* ── Lightbox ── */
+function Lightbox({
+  src,
+  alt,
+  onClose,
+}: {
+  src: string;
+  alt: string;
+  onClose: () => void;
+}) {
+  /* Close on Escape */
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  /* Lock scroll */
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
+  return (
+    <motion.div
+      key="lightbox-backdrop"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-[500] bg-zinc-950/95 flex items-center justify-center p-4 md:p-10"
+      onClick={onClose}
+      aria-modal="true"
+      role="dialog"
+      aria-label="Product image lightbox"
+    >
+      {/* Close button */}
+      <button
+        onClick={onClose}
+        aria-label="Close lightbox"
+        className="absolute top-5 right-6 text-zinc-400 hover:text-white transition-colors duration-200 z-10"
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+          strokeLinejoin="round" aria-hidden="true">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+
+      {/* Image — stops click from closing when clicking the image itself */}
+      <motion.div
+        key="lightbox-image"
+        initial={{ opacity: 0, scale: 0.94 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.94 }}
+        transition={{ duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] }}
+        className="relative w-full max-w-xl max-h-[90vh] aspect-[3/4]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Image
+          src={src}
+          alt={alt}
+          fill
+          sizes="(max-width: 768px) 95vw, 600px"
+          className="object-contain"
+          priority
+        />
+      </motion.div>
+    </motion.div>
+  );
+}
+
 /* ── Main PDP ── */
 export default function ProductPage() {
   const params = useParams();
@@ -57,9 +134,11 @@ export default function ProductPage() {
   const product = getProduct(id);
 
   const { addItem, openCart } = useCart();
+  const { showToast } = useToast();
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [sizeError, setSizeError] = useState(false);
   const [added, setAdded] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   function handleAddToBag() {
     if (!selectedSize && product && product.sizes.length > 1) {
@@ -75,6 +154,7 @@ export default function ProductPage() {
         image: product.images[0],
       });
       openCart();
+      showToast(`${product.name} added to bag.`);
     }
     setSizeError(false);
     setAdded(true);
@@ -111,15 +191,37 @@ export default function ProductPage() {
           {/* ══ LEFT — Scrollable image stack ══ */}
           <div className="flex flex-col gap-1">
             {product.images.map((src, i) => (
-              <div key={src} className="relative w-full aspect-[4/5] bg-smoke overflow-hidden">
+              <div
+                key={src}
+                className={[
+                  "relative w-full aspect-[4/5] bg-smoke overflow-hidden",
+                  product.isComingSoon ? "cursor-default" : "cursor-zoom-in",
+                ].join(" ")}
+                onClick={() => !product.isComingSoon && setLightboxSrc(src)}
+                role={product.isComingSoon ? undefined : "button"}
+                aria-label={product.isComingSoon ? undefined : `View ${product.name} — image ${i + 1} fullscreen`}
+                tabIndex={product.isComingSoon ? undefined : 0}
+                onKeyDown={(e) => !product.isComingSoon && e.key === "Enter" && setLightboxSrc(src)}
+              >
                 <Image
                   src={src}
                   alt={`${product.name} — view ${i + 1}`}
                   fill
                   priority={i === 0}
                   sizes="(max-width: 1024px) 100vw, 50vw"
-                  className="object-cover object-top"
+                  className={[
+                    "object-cover object-top transition-transform duration-700 ease-out",
+                    product.isComingSoon ? "" : "hover:scale-105",
+                  ].join(" ")}
                 />
+                {/* Coming soon overlay — hero image only */}
+                {product.isComingSoon && i === 0 && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center backdrop-blur-md bg-black/40">
+                    <p className="text-white font-black uppercase tracking-[0.2em] text-base md:text-lg">
+                      Coming Soon
+                    </p>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -209,18 +311,27 @@ export default function ProductPage() {
                 </div>
               )}
 
-              {/* ── Add to Bag ── */}
-              <button
-                onClick={handleAddToBag}
-                className={[
-                  "w-full py-4 text-xs tracking-widest uppercase transition-all duration-200",
-                  added
-                    ? "bg-[#758e6d] text-white"
-                    : "bg-primary text-white hover:bg-charcoal",
-                ].join(" ")}
-              >
-                {added ? "Added to Bag ✓" : "Add to Bag"}
-              </button>
+              {/* ── Add to Bag / Coming Soon ── */}
+              {product.isComingSoon ? (
+                <button
+                  disabled
+                  className="w-full py-4 text-xs tracking-[0.2em] uppercase bg-smoke text-chicago border border-mercury cursor-not-allowed"
+                >
+                  Coming Soon
+                </button>
+              ) : (
+                <button
+                  onClick={handleAddToBag}
+                  className={[
+                    "w-full py-4 text-xs tracking-widest uppercase transition-all duration-200",
+                    added
+                      ? "bg-[#758e6d] text-white"
+                      : "bg-primary text-white hover:bg-charcoal",
+                  ].join(" ")}
+                >
+                  {added ? "Added to Bag ✓" : "Add to Bag"}
+                </button>
+              )}
 
               {/* Trust strip */}
               <p className="mt-3 text-center text-[11px] tracking-widest uppercase text-chicago">
@@ -256,6 +367,17 @@ export default function ProductPage() {
       </main>
 
       <Footer />
+
+      {/* ── Lightbox ── */}
+      <AnimatePresence>
+        {lightboxSrc && (
+          <Lightbox
+            src={lightboxSrc}
+            alt={product.name}
+            onClose={() => setLightboxSrc(null)}
+          />
+        )}
+      </AnimatePresence>
     </>
   );
 }
