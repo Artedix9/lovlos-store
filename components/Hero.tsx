@@ -7,7 +7,7 @@ export default function Hero() {
 
       {/* Hero product image */}
       <Image
-        src="/Oversize Tee (alo) front-a.png"
+        src="/Main Hero Banner-4.png"
         alt="LOVLOS Oversize Tee — New Season Arrivals"
         fill
         priority
@@ -16,10 +16,10 @@ export default function Hero() {
       />
 
       {/* Light overlay for text legibility */}
-      <div
+      {/* <div
         className="absolute inset-0 bg-gradient-to-r from-white/60 via-white/20 to-transparent"
         aria-hidden="true"
-      />
+      /> */}
 
       {/* Content overlay */}
       <div className="absolute inset-0 flex flex-col justify-end pb-10 md:pb-16 px-5 md:px-16 lg:px-24">
