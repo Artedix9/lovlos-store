@@ -60,7 +60,10 @@ export async function POST(req: NextRequest) {
       total:          order.total,
       status:         order.status,
     });
-    if (error) throw error;
+    if (error) {
+      console.error("SUPABASE_ERROR_DETAIL:", error);
+      throw error;
+    }
 
     return NextResponse.json({ order }, { status: 201 });
   } catch (err) {
