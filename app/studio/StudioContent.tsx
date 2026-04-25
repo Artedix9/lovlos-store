@@ -6,62 +6,75 @@ import { motion, AnimatePresence } from "framer-motion";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
-/* ── Reusable fade-up variant ── */
 const fadeUp = {
-  hidden: { opacity: 0, y: 52 },
+  hidden: { opacity: 0, y: 44 },
   visible: (i: number = 0) => ({
     opacity: 1,
     y: 0,
-    transition: {
-      duration: 0.8,
-      ease: "easeOut" as const,
-      delay: i * 0.12,
-    },
+    transition: { duration: 0.8, ease: "easeOut" as const, delay: i * 0.1 },
   }),
 };
 
-/* ── Campaign / lookbook data ── */
-const CAMPAIGNS = [
+/*
+  Archive grid — 3-column explicit CSS grid placement:
+
+  [ 01 SILHOUETTE tall ] [ 02 ARCHITECTURE wide wide ]
+  [ 01 SILHOUETTE tall ] [ 03 TEXTURE ] [ 04 SHADOW ]
+  [ 05 MOTION wide wide ] [ 06 FORM tall ]
+                          [ 06 FORM tall ]
+*/
+const ARCHIVE = [
   {
-    src: "https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=900&q=85",
-    alt: "LOVLOS Campaign 01 — Studio",
-    label: "SS 2025 — Campaign 01",
-    tall: true,
+    id: "01",
+    label: "SILHOUETTE",
+    src: "https://images.unsplash.com/photo-1509629954671-66dead3f9ef9?auto=format&fit=crop&w=900&q=90",
+    alt: "Silhouette in dark alley",
+    // col 1, rows 1–2 (tall portrait)
+    placement: "col-start-1 row-start-1 row-span-2",
   },
   {
-    src: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=900&q=85",
-    alt: "LOVLOS Campaign 02 — Street",
-    label: "SS 2025 — Campaign 02",
-    tall: false,
+    id: "02",
+    label: "ARCHITECTURE",
+    src: "https://images.unsplash.com/photo-1486325212027-8081e485255e?auto=format&fit=crop&w=1400&q=90",
+    alt: "Minimal concrete architecture",
+    // cols 2–3, row 1 (wide landscape)
+    placement: "col-start-2 col-span-2 row-start-1",
   },
   {
-    src: "https://images.unsplash.com/photo-1556821840-3a63f15732ce?auto=format&fit=crop&w=900&q=85",
-    alt: "LOVLOS Campaign 03 — Movement",
-    label: "SS 2025 — Campaign 03",
-    tall: false,
+    id: "03",
+    label: "TEXTURE",
+    src: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=900&q=90",
+    alt: "Fabric stitching macro",
+    // col 2, row 2
+    placement: "col-start-2 row-start-2",
   },
   {
-    src: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=900&q=85",
-    alt: "LOVLOS Campaign 04 — Form",
-    label: "SS 2025 — Campaign 04",
-    tall: true,
+    id: "04",
+    label: "SHADOW",
+    src: "https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=900&q=90",
+    alt: "Shadow geometry interior",
+    // col 3, row 2
+    placement: "col-start-3 row-start-2",
   },
   {
-    src: "https://images.unsplash.com/photo-1469334031218-e382a71b716b?auto=format&fit=crop&w=900&q=85",
-    alt: "LOVLOS Campaign 05 — Identity",
-    label: "SS 2025 — Campaign 05",
-    tall: true,
+    id: "05",
+    label: "MOTION",
+    src: "https://images.unsplash.com/photo-1469334031218-e382a71b716b?auto=format&fit=crop&w=1400&q=90",
+    alt: "Movement editorial",
+    // cols 1–2, row 3 (wide landscape)
+    placement: "col-start-1 col-span-2 row-start-3",
   },
   {
-    src: "https://images.unsplash.com/photo-1544441893-675973e31985?auto=format&fit=crop&w=900&q=85",
-    alt: "LOVLOS Campaign 06 — Edge",
-    label: "SS 2025 — Campaign 06",
-    tall: false,
+    id: "06",
+    label: "FORM",
+    src: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=900&q=90",
+    alt: "Editorial form portrait",
+    // col 3, rows 3–4 (tall portrait)
+    placement: "col-start-3 row-start-3 row-span-2",
   },
 ];
 
-/* ── Lab / technical detail data ── */
-const LAB = [
+const LAB_DETAILS = [
   {
     src: "https://images.unsplash.com/photo-1542574621-e088a4464cc6?auto=format&fit=crop&w=800&q=85",
     alt: "Premium fabric weight",
@@ -83,15 +96,7 @@ const LAB = [
 ];
 
 /* ── Lightbox ── */
-function Lightbox({
-  src,
-  alt,
-  onClose,
-}: {
-  src: string;
-  alt: string;
-  onClose: () => void;
-}) {
+function Lightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
@@ -107,7 +112,7 @@ function Lightbox({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.22 }}
+      transition={{ duration: 0.2 }}
       className="fixed inset-0 z-[600] bg-black/95 flex items-center justify-center p-4 md:p-12"
       onClick={onClose}
       role="dialog"
@@ -116,21 +121,21 @@ function Lightbox({
     >
       <button
         onClick={onClose}
-        aria-label="Close lightbox"
-        className="absolute top-5 right-6 text-zinc-400 hover:text-white transition-colors duration-200 z-10"
+        aria-label="Close"
+        className="absolute top-5 right-6 text-zinc-500 hover:text-white transition-colors z-10"
       >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
           <line x1="18" y1="6" x2="6" y2="18" />
           <line x1="6" y1="6" x2="18" y2="18" />
         </svg>
       </button>
 
       <motion.div
-        initial={{ opacity: 0, scale: 0.93 }}
+        initial={{ opacity: 0, scale: 0.94 }}
         animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.93 }}
-        transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+        exit={{ opacity: 0, scale: 0.94 }}
+        transition={{ duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] }}
         className="relative w-full max-w-2xl max-h-[90vh] aspect-[3/4]"
         onClick={(e) => e.stopPropagation()}
       >
@@ -151,20 +156,16 @@ export default function StudioContent() {
 
       {/* ══ HERO ══ */}
       <section className="relative w-full h-screen overflow-hidden bg-black">
-        {/* Background image */}
         <Image
           src="https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=1800&q=90"
-          alt="LOVLOS Studio — editorial"
+          alt="LOVLOS Studio"
           fill
           priority
           sizes="100vw"
           className="object-cover object-center opacity-40"
         />
-
-        {/* Gradient vignette */}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-black/40" />
 
-        {/* Outlined STUDIO — sole typographic element, perfectly centered */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
           <span
             className="font-display font-black uppercase leading-none"
@@ -180,7 +181,6 @@ export default function StudioContent() {
           </span>
         </div>
 
-        {/* Scroll indicator */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -196,17 +196,17 @@ export default function StudioContent() {
         </motion.div>
       </section>
 
-      {/* ══ THE ARCHIVE — Lookbook Grid ══ */}
+      {/* ══ THE ARCHIVE ══ */}
       <section className="bg-zinc-950 py-24 md:py-32 px-6 md:px-10 lg:px-16">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-[1440px] mx-auto">
 
-          {/* Section header */}
+          {/* Header */}
           <motion.div
             variants={fadeUp}
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, margin: "-80px" }}
-            className="mb-14"
+            className="mb-12"
           >
             <p className="text-[10px] tracking-[0.35em] uppercase text-zinc-600 font-sans mb-3">
               Visual Archives
@@ -219,34 +219,72 @@ export default function StudioContent() {
             </h2>
           </motion.div>
 
-          {/* 2-column masonry grid */}
-          <div className="columns-1 sm:columns-2 gap-4 space-y-0">
-            {CAMPAIGNS.map((item, i) => (
+          {/* ── Desktop: explicit CSS grid ── */}
+          <div className="hidden md:grid md:grid-cols-3 md:auto-rows-[340px] lg:auto-rows-[380px] gap-3 lg:gap-4">
+            {ARCHIVE.map((item, i) => (
               <motion.div
-                key={item.src}
-                custom={i % 3}
+                key={item.id}
+                custom={i * 0.5}
+                variants={fadeUp}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-80px" }}
+                className={[
+                  item.placement,
+                  "group relative overflow-hidden bg-zinc-900 cursor-zoom-in",
+                ].join(" ")}
+                onClick={() => setLightboxSrc({ src: item.src, alt: item.alt })}
+              >
+                <Image
+                  src={item.src}
+                  alt={item.alt}
+                  fill
+                  sizes="(max-width: 1024px) 50vw, 33vw"
+                  className="object-cover object-center transition-transform duration-700 ease-out group-hover:scale-105"
+                />
+
+                {/* Darkening overlay */}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-300" />
+
+                {/* Corner label — slides up on hover */}
+                <div className="absolute bottom-4 left-4 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 ease-out">
+                  <span className="text-[9px] tracking-[0.3em] uppercase text-white/90 font-sans">
+                    {item.id} / {item.label}
+                  </span>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* ── Mobile: vertical stack ── */}
+          <div className="md:hidden flex flex-col gap-3">
+            {ARCHIVE.map((item, i) => (
+              <motion.div
+                key={item.id}
+                custom={i * 0.4}
                 variants={fadeUp}
                 initial="hidden"
                 whileInView="visible"
                 viewport={{ once: true, margin: "-60px" }}
-                className="break-inside-avoid mb-4 group relative cursor-zoom-in overflow-hidden"
+                className="group relative overflow-hidden bg-zinc-900 cursor-zoom-in"
                 onClick={() => setLightboxSrc({ src: item.src, alt: item.alt })}
               >
                 <div className={[
-                  "relative w-full overflow-hidden bg-zinc-900",
-                  item.tall ? "aspect-[3/4]" : "aspect-[4/5]",
+                  "relative w-full overflow-hidden",
+                  /* Alternate tall/wide to keep mobile feed varied */
+                  i % 3 === 0 ? "aspect-[3/4]" : "aspect-[4/3]",
                 ].join(" ")}>
                   <Image
                     src={item.src}
                     alt={item.alt}
                     fill
-                    sizes="(max-width: 640px) 100vw, 50vw"
-                    className="object-cover object-top transition-transform duration-700 ease-out group-hover:scale-105"
+                    sizes="100vw"
+                    className="object-cover object-center transition-transform duration-700 group-hover:scale-105"
                   />
-                  {/* Hover overlay */}
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-400 flex items-end p-5">
-                    <span className="text-[10px] tracking-[0.25em] uppercase text-white/0 group-hover:text-white/80 transition-all duration-300 font-sans">
-                      {item.label}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-300" />
+                  <div className="absolute bottom-4 left-4 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
+                    <span className="text-[9px] tracking-[0.3em] uppercase text-white/90 font-sans">
+                      {item.id} / {item.label}
                     </span>
                   </div>
                 </div>
@@ -258,15 +296,15 @@ export default function StudioContent() {
 
       {/* ══ THE LAB ══ */}
       <section className="bg-black py-24 md:py-32 px-6 md:px-10 lg:px-16">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-[1440px] mx-auto">
 
-          {/* Section header */}
+          {/* Header */}
           <motion.div
             variants={fadeUp}
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, margin: "-80px" }}
-            className="mb-14"
+            className="mb-12"
           >
             <p className="text-[10px] tracking-[0.35em] uppercase text-zinc-600 font-sans mb-3">
               Materials &amp; Construction
@@ -279,9 +317,37 @@ export default function StudioContent() {
             </h2>
           </motion.div>
 
-          {/* 3-column detail grid */}
+          {/* Philosophy — monospaced */}
+          <motion.div
+            variants={fadeUp}
+            custom={1}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-60px" }}
+            className="mb-20 max-w-2xl border-l border-zinc-800 pl-6"
+          >
+            <p className="font-mono text-[11px] text-zinc-500 leading-[2] tracking-wide">
+              Three principles. One intention.
+            </p>
+            <div className="mt-6 space-y-6 font-mono text-[11px] leading-[2] tracking-wide">
+              <div>
+                <span className="text-white">QUALITY —</span>
+                <span className="text-zinc-500"> We source only what earns its place. Every gram of fabric, every thread count, every zipper pull is chosen with intent. If it doesn&apos;t feel right, it doesn&apos;t ship.</span>
+              </div>
+              <div>
+                <span className="text-white">PRECISION —</span>
+                <span className="text-zinc-500"> Our patterns are cut to the millimeter. Seams are double-locked. Proportions are mapped to the human form — structure without stiffness, shape without restriction.</span>
+              </div>
+              <div>
+                <span className="text-white">VIBE —</span>
+                <span className="text-zinc-500"> Design is energy. Before a piece is worn, it carries something. A feeling. A frequency. That&apos;s what LOVLOS is built on. Good vibes, defined.</span>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Detail grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-            {LAB.map((item, i) => (
+            {LAB_DETAILS.map((item, i) => (
               <motion.div
                 key={item.src}
                 custom={i}
@@ -292,7 +358,6 @@ export default function StudioContent() {
                 className="group cursor-zoom-in"
                 onClick={() => setLightboxSrc({ src: item.src, alt: item.alt })}
               >
-                {/* Image */}
                 <div className="relative aspect-square overflow-hidden bg-zinc-900 mb-5">
                   <Image
                     src={item.src}
@@ -301,10 +366,8 @@ export default function StudioContent() {
                     sizes="(max-width: 768px) 100vw, 33vw"
                     className="object-cover object-center transition-transform duration-700 ease-out group-hover:scale-105"
                   />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-400" />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300" />
                 </div>
-
-                {/* Caption */}
                 <div className="space-y-2">
                   <div className="w-5 h-px bg-zinc-700" />
                   <p className="text-xs font-black tracking-[0.25em] uppercase text-white">
