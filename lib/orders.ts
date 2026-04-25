@@ -1,6 +1,7 @@
 import type { CartItem } from "@/context/CartContext";
 
 export interface OrderPayload {
+  id: string;
   customer_name: string;
   phone: string;
   email: string;

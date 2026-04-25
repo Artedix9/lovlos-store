@@ -8,7 +8,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useCart } from "@/context/CartContext";
 import { formatTZS } from "@/lib/products";
-import { buildWhatsAppUrl } from "@/lib/orders";
+import { buildWhatsAppUrl, generateOrderId } from "@/lib/orders";
 import type { OrderPayload, SavedOrder } from "@/lib/orders";
 
 const CITIES = [
@@ -125,6 +125,7 @@ export default function CheckoutPage() {
     setApiError(null);
 
     const payload: OrderPayload = {
+      id: generateOrderId(),
       customer_name: form.name.trim(),
       phone: form.phone.trim(),
       email: form.email.trim(),

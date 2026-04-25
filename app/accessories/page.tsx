@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import ProductCard, { type Product } from "@/components/ProductCard";
+import CategoryShell from "@/components/CategoryShell";
+import type { CategoryTile } from "@/components/CategoryShell";
+import type { Product } from "@/components/ProductCard";
 
 export const metadata: Metadata = {
   title: "Accessories — LOVLOS",
@@ -10,21 +13,21 @@ export const metadata: Metadata = {
 };
 
 const PRODUCTS: Product[] = [
-  { id: "a1", name: "Canvas Tote Bag", price: 65000, href: "/product/canvas-tote", badge: "New", gradient: "from-[#e0d7d1] to-[#c8bfb9]" },
-  { id: "a2", name: "Minimalist Watch", price: 450000, href: "/product/minimalist-watch", gradient: "from-[#d4d0cb] to-[#bcb8b2]" },
-  { id: "a3", name: "Woven Leather Belt", price: 85000, href: "/product/leather-belt", gradient: "from-[#ceb18f] to-[#b89878]" },
-  { id: "a4", name: "Structured Cap", price: 55000, href: "/product/structured-cap", badge: "Best Seller", gradient: "from-[#ddd9d4] to-[#c5c1bc]" },
-  { id: "a5", name: "Sports Socks (3-pack)", price: 35000, href: "/product/sports-socks", gradient: "from-[#e4e0dc] to-[#ccc8c3]" },
-  { id: "a6", name: "Natural Rubber Yoga Mat", price: 125000, href: "/product/yoga-mat", gradient: "from-[#d6d2cc] to-[#b8b4af]" },
-  { id: "a7", name: "Insulated Water Bottle", price: 75000, href: "/product/water-bottle", badge: "New", gradient: "from-[#e2deda] to-[#cac6c1]" },
-  { id: "a8", name: "Minimal Crossbody Bag", price: 195000, href: "/product/crossbody-bag", gradient: "from-[#d8d4cf] to-[#c0bcb7]" },
+  { id: "a1", name: "Canvas Tote Bag",        price: 65000,  href: "/product/canvas-tote",       badge: "New",         gradient: "from-[#e0d7d1] to-[#c8bfb9]" },
+  { id: "a2", name: "Minimalist Watch",        price: 450000, href: "/product/minimalist-watch",                        gradient: "from-[#d4d0cb] to-[#bcb8b2]" },
+  { id: "a3", name: "Woven Leather Belt",      price: 85000,  href: "/product/leather-belt",                            gradient: "from-[#ceb18f] to-[#b89878]" },
+  { id: "a4", name: "Structured Cap",          price: 55000,  href: "/product/structured-cap",    badge: "Best Seller", gradient: "from-[#ddd9d4] to-[#c5c1bc]" },
+  { id: "a5", name: "Sports Socks (3-pack)",   price: 35000,  href: "/product/sports-socks",                            gradient: "from-[#e4e0dc] to-[#ccc8c3]" },
+  { id: "a6", name: "Natural Rubber Yoga Mat", price: 125000, href: "/product/yoga-mat",                                gradient: "from-[#d6d2cc] to-[#b8b4af]" },
+  { id: "a7", name: "Insulated Water Bottle",  price: 75000,  href: "/product/water-bottle",      badge: "New",         gradient: "from-[#e2deda] to-[#cac6c1]" },
+  { id: "a8", name: "Minimal Crossbody Bag",   price: 195000, href: "/product/crossbody-bag",                           gradient: "from-[#d8d4cf] to-[#c0bcb7]" },
 ];
 
-const CATEGORIES = [
-  { label: "Bags", href: "/accessories/bags", gradient: "from-[#e0d7d1] to-[#c8bfb9]" },
-  { label: "Hats & Caps", href: "/accessories/hats", gradient: "from-[#ddd9d4] to-[#c5c1bc]" },
-  { label: "Yoga & Studio", href: "/accessories/yoga", gradient: "from-[#d6d2cc] to-[#b8b4af]" },
-  { label: "Lifestyle", href: "/accessories/lifestyle", gradient: "from-[#ceb18f] to-[#b89878]" },
+const TILES: CategoryTile[] = [
+  { label: "Bags",          slug: "bags",      keywords: ["bag", "tote", "crossbody"],        gradient: "from-[#e0d7d1] to-[#c8bfb9]", overlayClass: "bg-primary/0 group-hover:bg-primary/10" },
+  { label: "Hats & Caps",   slug: "hats",      keywords: ["hat", "cap", "beanie"],            gradient: "from-[#ddd9d4] to-[#c5c1bc]", overlayClass: "bg-primary/0 group-hover:bg-primary/10" },
+  { label: "Yoga & Studio", slug: "yoga",      keywords: ["yoga", "mat", "bottle", "band"],   gradient: "from-[#d6d2cc] to-[#b8b4af]", overlayClass: "bg-primary/0 group-hover:bg-primary/10" },
+  { label: "Lifestyle",     slug: "lifestyle", keywords: ["sock", "belt", "watch"],           gradient: "from-[#ceb18f] to-[#b89878]", overlayClass: "bg-primary/0 group-hover:bg-primary/10" },
 ];
 
 export default function AccessoriesPage() {
@@ -60,48 +63,10 @@ export default function AccessoriesPage() {
         </div>
       </section>
 
-      {/* ── Product Grid ── */}
-      <section id="products" className="max-w-7xl mx-auto px-6 md:px-10 lg:px-16 py-20">
-        <div className="flex items-baseline justify-between mb-10">
-          <h2 className="font-display text-3xl font-bold uppercase tracking-tight">New Arrivals</h2>
-          <span className="text-xs tracking-widest uppercase text-chicago">
-            {PRODUCTS.length} items
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-10">
-          {PRODUCTS.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
-
-        <div className="flex justify-center mt-14">
-          <button className="btn-outline">View All Accessories</button>
-        </div>
-      </section>
-
-      {/* ── Shop by Category ── */}
-      <section className="max-w-7xl mx-auto px-6 md:px-10 lg:px-16 pb-20">
-        <h2 className="font-display text-3xl font-bold uppercase tracking-tight mb-10">Shop by Category</h2>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {CATEGORIES.map((cat) => (
-            <Link
-              key={cat.label}
-              href={cat.href}
-              className="group relative aspect-square overflow-hidden bg-smoke"
-            >
-              <div className={`absolute inset-0 bg-gradient-to-br ${cat.gradient} group-hover:scale-105 transition-transform duration-500`} />
-              <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/10 transition-colors duration-300" />
-              <div className="absolute inset-0 flex items-end p-5">
-                <span className="text-sm tracking-widest uppercase text-primary font-sans">
-                  {cat.label}
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
+      {/* ── Interactive grid + category tiles ── */}
+      <Suspense>
+        <CategoryShell products={PRODUCTS} tiles={TILES} />
+      </Suspense>
 
       <Footer />
     </>

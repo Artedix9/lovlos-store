@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
+import { Suspense } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import ProductCard from "@/components/ProductCard";
+import CategoryShell from "@/components/CategoryShell";
+import type { CategoryTile } from "@/components/CategoryShell";
 import { PRODUCTS } from "@/lib/products";
 import type { Product } from "@/components/ProductCard";
 
@@ -24,21 +26,29 @@ const MEN_PRODUCTS: Product[] = PRODUCTS
     isComingSoon: p.isComingSoon,
   }));
 
-const CATEGORIES = [
+const TILES: CategoryTile[] = [
   {
-    label: "Tops", href: "/men/tops",
+    label: "Tops",
+    slug: "tops",
+    keywords: ["tee", "polo", "shirt", "hoodie", "crewneck", "sweatshirt"],
     image: "https://images.unsplash.com/photo-1512327536842-5aa37d1ba3e3?auto=format&fit=crop&w=600&q=80",
   },
   {
-    label: "Bottoms", href: "/men/bottoms",
+    label: "Bottoms",
+    slug: "bottoms",
+    keywords: ["pant", "short", "trouser"],
     image: "https://images.unsplash.com/photo-1542574621-e088a4464cc6?auto=format&fit=crop&w=600&q=80",
   },
   {
-    label: "Outerwear", href: "/men/outerwear",
+    label: "Outerwear",
+    slug: "outerwear",
+    keywords: ["jacket", "overshirt"],
     image: "https://images.unsplash.com/photo-1544441893-675973e31985?auto=format&fit=crop&w=600&q=80",
   },
   {
-    label: "Studio", href: "/men/studio",
+    label: "Studio",
+    slug: "studio",
+    keywords: ["performance", "track", "studio"],
     image: "https://images.unsplash.com/photo-1571945153237-4929e783af4a?auto=format&fit=crop&w=600&q=80",
   },
 ];
@@ -76,54 +86,10 @@ export default function MenPage() {
         </div>
       </section>
 
-      {/* ── Product Grid ── */}
-      <section id="products" className="max-w-7xl mx-auto px-6 md:px-10 lg:px-16 py-20">
-        <div className="flex items-baseline justify-between mb-10">
-          <h2 className="font-display text-3xl font-bold uppercase tracking-tight">New Arrivals</h2>
-          <span className="text-xs tracking-widest uppercase text-chicago">
-            {MEN_PRODUCTS.length} items
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-10">
-          {MEN_PRODUCTS.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
-
-        <div className="flex justify-center mt-14">
-          <button className="btn-outline">View All Men</button>
-        </div>
-      </section>
-
-      {/* ── Shop by Category ── */}
-      <section className="max-w-7xl mx-auto px-6 md:px-10 lg:px-16 pb-20">
-        <h2 className="font-display text-3xl font-bold uppercase tracking-tight mb-10">Shop by Category</h2>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {CATEGORIES.map((cat) => (
-            <Link
-              key={cat.label}
-              href={cat.href}
-              className="group relative aspect-square overflow-hidden bg-smoke"
-            >
-              <Image
-                src={cat.image}
-                alt={cat.label}
-                fill
-                sizes="(max-width: 768px) 50vw, 25vw"
-                className="object-cover object-center group-hover:scale-105 transition-transform duration-500"
-              />
-              <div className="absolute inset-0 bg-primary/30 group-hover:bg-primary/50 transition-colors duration-300" />
-              <div className="absolute inset-0 flex items-end p-5">
-                <span className="text-sm tracking-widest uppercase text-white font-sans">
-                  {cat.label}
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
+      {/* ── Interactive grid + category tiles ── */}
+      <Suspense>
+        <CategoryShell products={MEN_PRODUCTS} tiles={TILES} />
+      </Suspense>
 
       <Footer />
     </>

@@ -54,7 +54,7 @@ export default function ProductCard({ product }: { product: Product }) {
           src={product.image}
           alt={`LOVLOS ${product.name}`}
           fill
-          sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw"
+          sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 22vw"
           className={[
             "object-cover object-top transition-transform duration-700 ease-out",
             comingSoon ? "" : "group-hover:scale-105",

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateOrderId } from "@/lib/orders";
 import type { OrderPayload, SavedOrder } from "@/lib/orders";
 
 /**
@@ -36,7 +35,6 @@ export async function POST(req: NextRequest) {
 
     const order: SavedOrder = {
       ...body,
-      id: generateOrderId(),
       status: "pending",
       created_at: new Date().toISOString(),
     };
