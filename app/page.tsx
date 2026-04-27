@@ -5,7 +5,10 @@ export default function Home() {
   return (
     <main>
       <Header />
-      <Hero />
+      <Hero
+        desktopSrc="/Main Hero Banner-4.png"
+        mobileSrc="/Main Hero Banner-Mobile.png"
+      />
     </main>
   );
 }

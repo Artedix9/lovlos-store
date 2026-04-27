@@ -1,25 +1,38 @@
 import Link from "next/link";
 import Image from "next/image";
 
-export default function Hero() {
+interface HeroProps {
+  desktopSrc: string;
+  mobileSrc: string;
+}
+
+export default function Hero({ desktopSrc, mobileSrc }: HeroProps) {
   return (
-    <section className="relative w-full h-[92vh] min-h-[560px] bg-smoke overflow-hidden">
+    <section className="relative w-full overflow-hidden bg-smoke">
 
-      {/* Hero product image */}
-      <Image
-        src="/Main Hero Banner-4.png"
-        alt="LOVLOS Oversize Tee — New Season Arrivals"
-        fill
-        priority
-        sizes="100vw"
-        className="object-cover object-top"
-      />
+      {/* Mobile image — visible below md breakpoint */}
+      <div className="relative w-full min-h-[80vh] md:hidden">
+        <Image
+          src={mobileSrc}
+          alt="LOVLOS — New Season Arrivals"
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-center"
+        />
+      </div>
 
-      {/* Light overlay for text legibility */}
-      {/* <div
-        className="absolute inset-0 bg-gradient-to-r from-white/60 via-white/20 to-transparent"
-        aria-hidden="true"
-      /> */}
+      {/* Desktop image — visible at md and above */}
+      <div className="relative w-full h-[80vh] hidden md:block">
+        <Image
+          src={desktopSrc}
+          alt="LOVLOS — New Season Arrivals"
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-center"
+        />
+      </div>
 
       {/* Content overlay */}
       <div className="absolute inset-0 flex flex-col justify-end pb-10 md:pb-16 px-5 md:px-16 lg:px-24">

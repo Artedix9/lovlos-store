@@ -67,18 +67,35 @@ export default async function WomenPage() {
       <Header />
 
       {/* ── Hero Banner ── */}
-      <section className="relative w-full h-[70vh] min-h-[480px] overflow-hidden">
-        <Image
-          src="https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?auto=format&fit=crop&w=1800&q=85"
-          alt="Women's collection hero"
-          fill
-          priority
-          className="object-cover object-center"
-          sizes="100vw"
-        />
+      <section className="relative w-full overflow-hidden bg-smoke">
+
+        {/* Mobile image — portrait, visible below md */}
+        <div className="relative w-full min-h-[80vh] md:hidden">
+          <Image
+            src="https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=1000&auto=format&fit=crop"
+            alt="Women's collection hero"
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover object-center"
+          />
+        </div>
+
+        {/* Desktop image — wide, visible at md and above */}
+        <div className="relative w-full h-[80vh] hidden md:block">
+          <Image
+            src="https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?q=80&w=2070&auto=format&fit=crop"
+            alt="Women's collection hero"
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover object-center"
+          />
+        </div>
+
         <div className="absolute inset-0 bg-gradient-to-r from-white/70 via-white/30 to-transparent" />
 
-        <div className="relative flex flex-col justify-end h-full pb-10 md:pb-16 px-5 md:px-16 lg:px-24">
+        <div className="absolute inset-0 flex flex-col justify-end pb-10 md:pb-16 px-5 md:px-16 lg:px-24">
           <p className="text-xs tracking-ultra uppercase text-charcoal mb-3 font-sans">
             Spring / Summer 2025
           </p>
