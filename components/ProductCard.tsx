@@ -28,7 +28,15 @@ function formatTZS(amount: number): string {
   return `TZS ${amount.toLocaleString("en-TZ")}`;
 }
 
-export default function ProductCard({ product }: { product: Product }) {
+export default function ProductCard({
+  product,
+  cardLabel,
+  hideQuickAdd = false,
+}: {
+  product: Product;
+  cardLabel?: string;
+  hideQuickAdd?: boolean;
+}) {
   const { addItem } = useCart();
   const { showToast } = useToast();
   const [adding, setAdding] = useState(false);
@@ -87,15 +95,15 @@ export default function ProductCard({ product }: { product: Product }) {
         </div>
       )}
 
-      {/* Badge — only shown when not coming soon */}
-      {product.badge && !comingSoon && (
+      {/* Badge — suppressed in trending/label mode */}
+      {product.badge && !comingSoon && !cardLabel && (
         <span className="absolute top-3 left-3 bg-primary text-white text-[10px] tracking-widest uppercase px-2 py-1 z-10">
           {product.badge}
         </span>
       )}
 
-      {/* Quick Add — only when not coming soon */}
-      {!comingSoon && (
+      {/* Quick Add — suppressed in hideQuickAdd mode or when coming soon */}
+      {!comingSoon && !hideQuickAdd && (
         <div className="absolute bottom-0 left-0 right-0 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out z-10">
           <button
             onClick={handleQuickAdd}
@@ -121,47 +129,53 @@ export default function ProductCard({ product }: { product: Product }) {
         <Link href={product.href}>{imageArea}</Link>
       )}
 
-      {/* Details */}
-      <div className="mt-3 flex flex-col gap-1">
-        {comingSoon ? (
-          <p className="text-sm text-chicago leading-snug tracking-wide">{product.name}</p>
-        ) : (
-          <Link
-            href={product.href}
-            className="text-sm text-primary hover:text-chicago transition-colors duration-200 leading-snug tracking-wide"
-          >
-            {product.name}
-          </Link>
-        )}
-        <p className="text-sm text-chicago tracking-wide">
-          {comingSoon ? "—" : formatTZS(product.price)}
+      {/* Details — replaced by a category label in trending/label mode */}
+      {cardLabel ? (
+        <p className="mt-8 text-xl font-bold uppercase tracking-wide text-center text-primary">
+          {cardLabel}
         </p>
+      ) : (
+        <div className="mt-3 flex flex-col gap-1">
+          {comingSoon ? (
+            <p className="text-sm text-chicago leading-snug tracking-wide">{product.name}</p>
+          ) : (
+            <Link
+              href={product.href}
+              className="text-sm text-primary hover:text-chicago transition-colors duration-200 leading-snug tracking-wide"
+            >
+              {product.name}
+            </Link>
+          )}
+          <p className="text-sm text-chicago tracking-wide">
+            {comingSoon ? "—" : formatTZS(product.price)}
+          </p>
 
-        {/* Color swatches */}
-        {!comingSoon && product.colors && product.colors.length > 1 && (
-          <div className="flex gap-1.5 mt-1">
-            {product.colors.map((color) => (
-              <button
-                key={color.name}
-                title={color.name}
-                onClick={(e) => {
-                  e.preventDefault();
-                  setSelectedColor(color);
-                }}
-                aria-label={color.name}
-                aria-pressed={selectedColor?.name === color.name}
-                className={[
-                  "w-4 h-4 rounded-full border transition-all duration-150 focus:outline-none",
-                  selectedColor?.name === color.name
-                    ? "ring-1 ring-offset-1 ring-primary"
-                    : "border-transparent hover:ring-1 hover:ring-offset-1 hover:ring-chicago",
-                ].join(" ")}
-                style={{ backgroundColor: color.hex }}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+          {/* Color swatches */}
+          {!comingSoon && product.colors && product.colors.length > 1 && (
+            <div className="flex gap-1.5 mt-1">
+              {product.colors.map((color) => (
+                <button
+                  key={color.name}
+                  title={color.name}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setSelectedColor(color);
+                  }}
+                  aria-label={color.name}
+                  aria-pressed={selectedColor?.name === color.name}
+                  className={[
+                    "w-4 h-4 rounded-full border transition-all duration-150 focus:outline-none",
+                    selectedColor?.name === color.name
+                      ? "ring-1 ring-offset-1 ring-primary"
+                      : "border-transparent hover:ring-1 hover:ring-offset-1 hover:ring-chicago",
+                  ].join(" ")}
+                  style={{ backgroundColor: color.hex }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </article>
   );
 }

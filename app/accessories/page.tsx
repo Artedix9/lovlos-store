@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { Suspense } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -43,16 +44,33 @@ export default async function AccessoriesPage() {
       <Header />
 
       {/* ── Hero Banner ── */}
-      <section className="relative w-full h-[70vh] min-h-[480px] overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#e0d7d1] via-[#ece8e4] to-[#f4f0ec]" />
-        <div
-          className="absolute inset-0 opacity-35"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 60% 70%, #ceb18f 0%, transparent 40%), radial-gradient(circle at 10% 20%, #e0d7d1 0%, transparent 40%)",
-          }}
-          aria-hidden="true"
-        />
+      <section className="relative w-full overflow-hidden bg-smoke">
+
+        {/* Mobile image — portrait, visible below md */}
+        <div className="relative w-full min-h-[80vh] md:hidden">
+          <Image
+            src="https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=1000&auto=format&fit=crop"
+            alt="Accessories collection hero"
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover object-center"
+          />
+        </div>
+
+        {/* Desktop image — wide, visible at md and above */}
+        <div className="relative w-full h-[80vh] hidden md:block">
+          <Image
+            src="https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=2070&auto=format&fit=crop"
+            alt="Accessories collection hero"
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover object-center"
+          />
+        </div>
+
+        <div className="absolute inset-0 bg-gradient-to-r from-white/70 via-white/30 to-transparent" />
 
         <div className="absolute inset-0 flex flex-col justify-end pb-10 md:pb-16 px-5 md:px-16 lg:px-24">
           <p className="text-xs tracking-ultra uppercase text-charcoal mb-3 font-sans">
