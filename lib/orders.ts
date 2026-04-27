@@ -33,21 +33,25 @@ export function generateOrderId(): string {
 /** Build the WhatsApp deep-link message */
 export function buildWhatsAppUrl(order: SavedOrder): string {
   const itemLines = order.items
-    .map((item) => `  • ${item.name} (${item.size}) x${item.quantity} — TZS ${(item.price * item.quantity).toLocaleString("en-TZ")}`)
+    .map((item) => {
+      const variant = [item.color, item.size].filter(Boolean).join(", ");
+      return `  • ${item.name} (${variant}) x${item.quantity} — TZS ${(item.price * item.quantity).toLocaleString("en-TZ")}`;
+    })
     .join("\n");
 
   const message =
-    `🛍️ NEW ORDER: LOVLOS — ${order.id}\n\n` +
+    `Hello LOVLOS, I'd like to place an order.\n\n` +
+    `Order ID: ${order.id}\n` +
     `Customer: ${order.customer_name}\n` +
     `Phone: ${order.phone}\n` +
-    `Email: ${order.email}\n` +
-    `Delivery: ${order.city}${order.delivery_note ? ` — ${order.delivery_note}` : ""}\n` +
-    `Payment: ${order.payment_method === "mobile-money" ? "Mobile Money" : "Cash on Delivery"}\n\n` +
+    `Delivery: ${order.city}${order.delivery_note ? ` — ${order.delivery_note}` : ""}\n\n` +
     `Items:\n${itemLines}\n\n` +
-    `Subtotal: TZS ${order.subtotal.toLocaleString("en-TZ")}\n` +
-    `Delivery: ${order.delivery_fee === 0 ? "Free" : `TZS ${order.delivery_fee.toLocaleString("en-TZ")}`}\n` +
     `Total: TZS ${order.total.toLocaleString("en-TZ")}\n\n` +
-    `Please confirm M-Pesa / TigoPesa payment to start delivery.`;
+    `PAYMENT DETAILS:\n` +
+    `Method: Selcom Lipa Namba\n` +
+    `Number: 70019014\n` +
+    `Name: Edrick Neckemia Katabarula\n\n` +
+    `Please send the transaction screenshot here to confirm your order.`;
 
   return `https://wa.me/255746704036?text=${encodeURIComponent(message)}`;
 }

@@ -6,25 +6,15 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import CategoryShell from "@/components/CategoryShell";
 import type { CategoryTile } from "@/components/CategoryShell";
-import { PRODUCTS } from "@/lib/products";
+import { getProducts } from "@/lib/data";
 import type { Product } from "@/components/ProductCard";
+
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "Men — LOVLOS",
   description: "Explore the LOVLOS men's collection. Clean, minimal essentials built for modern life.",
 };
-
-const MEN_PRODUCTS: Product[] = PRODUCTS
-  .filter((p) => p.category === "Men")
-  .map((p) => ({
-    id: p.id,
-    name: p.name,
-    price: p.price,
-    href: `/product/${p.id}`,
-    badge: p.badge,
-    image: p.images[0],
-    isComingSoon: p.isComingSoon,
-  }));
 
 const TILES: CategoryTile[] = [
   {
@@ -53,7 +43,22 @@ const TILES: CategoryTile[] = [
   },
 ];
 
-export default function MenPage() {
+export default async function MenPage() {
+  const allProducts = await getProducts();
+
+  const products: Product[] = allProducts
+    .filter((p) => p.category === "Men")
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      href: `/product/${p.id}`,
+      badge: p.badge,
+      image: p.colors?.[0]?.image ?? p.images[0],
+      colors: p.colors,
+      isComingSoon: p.isComingSoon,
+    }));
+
   return (
     <>
       <Header />
@@ -88,7 +93,7 @@ export default function MenPage() {
 
       {/* ── Interactive grid + category tiles ── */}
       <Suspense>
-        <CategoryShell products={MEN_PRODUCTS} tiles={TILES} />
+        <CategoryShell products={products} tiles={TILES} />
       </Suspense>
 
       <Footer />

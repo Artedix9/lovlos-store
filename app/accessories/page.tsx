@@ -5,23 +5,15 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import CategoryShell from "@/components/CategoryShell";
 import type { CategoryTile } from "@/components/CategoryShell";
+import { getProducts } from "@/lib/data";
 import type { Product } from "@/components/ProductCard";
+
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "Accessories — LOVLOS",
   description: "Complete your LOVLOS look. Bags, caps, mats, and more — each piece crafted with intention.",
 };
-
-const PRODUCTS: Product[] = [
-  { id: "a1", name: "Canvas Tote Bag",        price: 65000,  href: "/product/canvas-tote",       badge: "New",         gradient: "from-[#e0d7d1] to-[#c8bfb9]" },
-  { id: "a2", name: "Minimalist Watch",        price: 450000, href: "/product/minimalist-watch",                        gradient: "from-[#d4d0cb] to-[#bcb8b2]" },
-  { id: "a3", name: "Woven Leather Belt",      price: 85000,  href: "/product/leather-belt",                            gradient: "from-[#ceb18f] to-[#b89878]" },
-  { id: "a4", name: "Structured Cap",          price: 55000,  href: "/product/structured-cap",    badge: "Best Seller", gradient: "from-[#ddd9d4] to-[#c5c1bc]" },
-  { id: "a5", name: "Sports Socks (3-pack)",   price: 35000,  href: "/product/sports-socks",                            gradient: "from-[#e4e0dc] to-[#ccc8c3]" },
-  { id: "a6", name: "Natural Rubber Yoga Mat", price: 125000, href: "/product/yoga-mat",                                gradient: "from-[#d6d2cc] to-[#b8b4af]" },
-  { id: "a7", name: "Insulated Water Bottle",  price: 75000,  href: "/product/water-bottle",      badge: "New",         gradient: "from-[#e2deda] to-[#cac6c1]" },
-  { id: "a8", name: "Minimal Crossbody Bag",   price: 195000, href: "/product/crossbody-bag",                           gradient: "from-[#d8d4cf] to-[#c0bcb7]" },
-];
 
 const TILES: CategoryTile[] = [
   { label: "Bags",          slug: "bags",      keywords: ["bag", "tote", "crossbody"],        gradient: "from-[#e0d7d1] to-[#c8bfb9]", overlayClass: "bg-primary/0 group-hover:bg-primary/10" },
@@ -30,7 +22,22 @@ const TILES: CategoryTile[] = [
   { label: "Lifestyle",     slug: "lifestyle", keywords: ["sock", "belt", "watch"],           gradient: "from-[#ceb18f] to-[#b89878]", overlayClass: "bg-primary/0 group-hover:bg-primary/10" },
 ];
 
-export default function AccessoriesPage() {
+export default async function AccessoriesPage() {
+  const allProducts = await getProducts();
+
+  const products: Product[] = allProducts
+    .filter((p) => p.category === "Accessories")
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      href: `/product/${p.id}`,
+      badge: p.badge,
+      image: p.colors?.[0]?.image ?? p.images[0],
+      colors: p.colors,
+      isComingSoon: p.isComingSoon,
+    }));
+
   return (
     <>
       <Header />
@@ -65,7 +72,7 @@ export default function AccessoriesPage() {
 
       {/* ── Interactive grid + category tiles ── */}
       <Suspense>
-        <CategoryShell products={PRODUCTS} tiles={TILES} />
+        <CategoryShell products={products} tiles={TILES} />
       </Suspense>
 
       <Footer />

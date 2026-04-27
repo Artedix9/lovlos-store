@@ -286,8 +286,8 @@ export default function CheckoutPage() {
                   {[
                     {
                       value: "mobile-money",
-                      label: "Mobile Money",
-                      sub: "M-Pesa · Tigo Pesa · Airtel Money",
+                      label: "Selcom Lipa Namba",
+                      sub: "Pay via M-Pesa, Tigo Pesa, or Airtel Money.",
                     },
                     {
                       value: "cash-on-delivery",
@@ -325,9 +325,20 @@ export default function CheckoutPage() {
                 </div>
 
                 {form.payment === "mobile-money" && (
-                  <div className="mt-4 border border-zinc-200 bg-zinc-50 px-4 py-3">
-                    <p className="text-xs text-zinc-600 tracking-wide leading-relaxed">
-                      After placing your order, WhatsApp will open with your full invoice. Send your payment screenshot to confirm.
+                  <div className="mt-4 border border-zinc-900 bg-zinc-50 px-4 py-4 space-y-3">
+                    <p className="text-[10px] font-bold tracking-ultra uppercase text-zinc-500">
+                      Payment Details
+                    </p>
+                    <div className="flex justify-between items-baseline border-b border-zinc-200 pb-2.5">
+                      <span className="text-[10px] tracking-widest uppercase text-zinc-500">Lipa Number</span>
+                      <span className="text-sm font-black tracking-tight text-zinc-950">70019014</span>
+                    </div>
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-[10px] tracking-widest uppercase text-zinc-500">Name</span>
+                      <span className="text-sm font-bold text-zinc-900 tracking-wide">Edrick Katabarula</span>
+                    </div>
+                    <p className="text-[11px] text-zinc-500 tracking-wide leading-relaxed pt-1 border-t border-zinc-200">
+                      After placing your order, WhatsApp will open with your invoice. Send your payment screenshot to confirm.
                     </p>
                   </div>
                 )}
@@ -355,7 +366,7 @@ export default function CheckoutPage() {
               {/* Items */}
               <ul className="divide-y divide-zinc-100">
                 {items.map((item) => (
-                  <li key={`${item.id}-${item.size}`} className="flex gap-4 py-4">
+                  <li key={`${item.id}-${item.size}-${item.color ?? ""}`} className="flex gap-4 py-4">
                     <div className="relative w-16 h-20 shrink-0 bg-zinc-100 overflow-hidden">
                       <Image
                         src={item.image}
@@ -375,6 +386,11 @@ export default function CheckoutPage() {
                       <p className="text-[10px] tracking-widest uppercase text-zinc-500">
                         Size: {item.size}
                       </p>
+                      {item.color && (
+                        <p className="text-[10px] tracking-widest uppercase text-zinc-500">
+                          Colour: {item.color}
+                        </p>
+                      )}
                     </div>
                     <p className="text-sm text-zinc-700 shrink-0 self-center">
                       {formatTZS(item.price * item.quantity)}

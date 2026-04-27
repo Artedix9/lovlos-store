@@ -6,6 +6,12 @@ import Image from "next/image";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/context/ToastContext";
 
+export interface ProductColor {
+  name: string;
+  hex: string;
+  image?: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -14,6 +20,7 @@ export interface Product {
   badge?: string;      // e.g. "New", "Best Seller"
   image?: string;      // URL or /public path — shown when provided
   gradient?: string;   // Tailwind gradient classes — fallback when no image
+  colors?: ProductColor[];
   isComingSoon?: boolean;
 }
 
@@ -27,6 +34,12 @@ export default function ProductCard({ product }: { product: Product }) {
   const [adding, setAdding] = useState(false);
   const comingSoon = product.isComingSoon ?? false;
 
+  const [selectedColor, setSelectedColor] = useState<ProductColor | null>(
+    product.colors?.[0] ?? null
+  );
+
+  const imageSrc = selectedColor?.image ?? product.image;
+
   function handleQuickAdd(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -37,10 +50,11 @@ export default function ProductCard({ product }: { product: Product }) {
       id: product.id,
       name: product.name,
       size: "M",
+      color: selectedColor?.name,
       price: product.price,
-      image: product.image ?? "",
+      image: imageSrc ?? "",
     });
-    showToast(`${product.name} added to bag.`);
+    showToast(`${product.name}${selectedColor ? ` — ${selectedColor.name}` : ""} added to bag.`);
 
     setTimeout(() => setAdding(false), 1200);
   }
@@ -49,10 +63,10 @@ export default function ProductCard({ product }: { product: Product }) {
     <div className="relative block overflow-hidden bg-smoke aspect-[3/4]">
 
       {/* Photo or gradient */}
-      {product.image ? (
+      {imageSrc ? (
         <Image
-          src={product.image}
-          alt={`LOVLOS ${product.name}`}
+          src={imageSrc}
+          alt={`LOVLOS ${product.name}${selectedColor ? ` in ${selectedColor.name}` : ""}`}
           fill
           sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 22vw"
           className={[
@@ -122,6 +136,31 @@ export default function ProductCard({ product }: { product: Product }) {
         <p className="text-sm text-chicago tracking-wide">
           {comingSoon ? "—" : formatTZS(product.price)}
         </p>
+
+        {/* Color swatches */}
+        {!comingSoon && product.colors && product.colors.length > 1 && (
+          <div className="flex gap-1.5 mt-1">
+            {product.colors.map((color) => (
+              <button
+                key={color.name}
+                title={color.name}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setSelectedColor(color);
+                }}
+                aria-label={color.name}
+                aria-pressed={selectedColor?.name === color.name}
+                className={[
+                  "w-4 h-4 rounded-full border transition-all duration-150 focus:outline-none",
+                  selectedColor?.name === color.name
+                    ? "ring-1 ring-offset-1 ring-primary"
+                    : "border-transparent hover:ring-1 hover:ring-offset-1 hover:ring-chicago",
+                ].join(" ")}
+                style={{ backgroundColor: color.hex }}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </article>
   );

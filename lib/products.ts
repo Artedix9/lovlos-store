@@ -1,5 +1,11 @@
 import productsData from "@/data/products.json";
 
+export interface ProductColor {
+  name: string;
+  hex: string;
+  image?: string;
+}
+
 export interface PDPProduct {
   id: string;
   name: string;
@@ -8,6 +14,7 @@ export interface PDPProduct {
   price: number;         // TZS
   badge?: string;
   images: string[];      // ordered: hero first
+  colors?: ProductColor[];
   sizes: string[];
   description: string;
   materials: string;

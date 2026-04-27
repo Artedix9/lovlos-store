@@ -116,7 +116,7 @@ export default function CartDrawer() {
           ) : (
             <ul className="divide-y divide-white/[0.06] px-6">
               {items.map((item) => (
-                <li key={`${item.id}-${item.size}`} className="flex gap-4 py-5">
+                <li key={`${item.id}-${item.size}-${item.color ?? ""}`} className="flex gap-4 py-5">
                   {/* Thumbnail */}
                   <div className="relative w-[72px] h-[90px] shrink-0 bg-zinc-800 overflow-hidden">
                     <Image
@@ -137,6 +137,11 @@ export default function CartDrawer() {
                       <p className="text-[10px] tracking-widest uppercase text-zinc-500 mt-0.5">
                         Size: {item.size}
                       </p>
+                      {item.color && (
+                        <p className="text-[10px] tracking-widest uppercase text-zinc-500 mt-0.5">
+                          Colour: {item.color}
+                        </p>
+                      )}
                       <p className="text-xs text-zinc-300 mt-1 tracking-wide">
                         {formatTZS(item.price)}
                       </p>
@@ -146,7 +151,7 @@ export default function CartDrawer() {
                     <div className="flex items-center mt-2 border border-white/10 w-fit">
                       <button
                         aria-label="Decrease quantity"
-                        onClick={() => updateQuantity(item.id, item.size, -1)}
+                        onClick={() => updateQuantity(item.id, item.size, item.color, -1)}
                         className="w-8 h-8 flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-white/5 transition-colors duration-150 text-base leading-none"
                       >
                         −
@@ -156,7 +161,7 @@ export default function CartDrawer() {
                       </span>
                       <button
                         aria-label="Increase quantity"
-                        onClick={() => updateQuantity(item.id, item.size, +1)}
+                        onClick={() => updateQuantity(item.id, item.size, item.color, +1)}
                         className="w-8 h-8 flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-white/5 transition-colors duration-150 text-base leading-none"
                       >
                         +

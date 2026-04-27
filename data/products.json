@@ -9,6 +9,11 @@
     "images": [
       "/Crop-top 1a.png"
     ],
+    "colors": [
+      { "name": "Ivory", "hex": "#f5f2ee" },
+      { "name": "Onyx", "hex": "#1a1a1a" },
+      { "name": "Sage", "hex": "#7a8b76" }
+    ],
     "sizes": [
       "XS",
       "S",
@@ -29,6 +34,10 @@
     "price": 85000,
     "images": [
       "/Crop-top 2a.png"
+    ],
+    "colors": [
+      { "name": "Cream", "hex": "#f0ede8" },
+      { "name": "Blush", "hex": "#d4a8a0" }
     ],
     "sizes": [
       "XS",
@@ -52,6 +61,10 @@
     "images": [
       "/Crop-top Long-sleeves(W)a.png"
     ],
+    "colors": [
+      { "name": "White", "hex": "#f5f5f5", "image": "/Crop-top Long-sleeves(W)a.png" },
+      { "name": "Onyx", "hex": "#1a1a1a", "image": "/Crop-top Long-sleeves(B)a.png" }
+    ],
     "sizes": [
       "XS",
       "S",
@@ -72,6 +85,10 @@
     "price": 98000,
     "images": [
       "/Crop-top Long-sleeves(B)a.png"
+    ],
+    "colors": [
+      { "name": "Onyx", "hex": "#1a1a1a" },
+      { "name": "Slate", "hex": "#4a5568" }
     ],
     "sizes": [
       "XS",
@@ -95,6 +112,10 @@
     "images": [
       "/Crop vest -a.png"
     ],
+    "colors": [
+      { "name": "Onyx", "hex": "#1a1a1a" },
+      { "name": "Ivory", "hex": "#f5f2ee" }
+    ],
     "sizes": [
       "XS",
       "S",
@@ -115,6 +136,10 @@
     "price": 75000,
     "images": [
       "/Crop vest 2-a.png"
+    ],
+    "colors": [
+      { "name": "White", "hex": "#f5f5f5" },
+      { "name": "Sand", "hex": "#c8b8a8" }
     ],
     "sizes": [
       "XS",
@@ -137,6 +162,10 @@
     "images": [
       "/Loose Crop Top (B)a.png"
     ],
+    "colors": [
+      { "name": "Onyx", "hex": "#1a1a1a" },
+      { "name": "Ecru", "hex": "#e8e0d8" }
+    ],
     "sizes": [
       "XS",
       "S",
@@ -157,6 +186,10 @@
     "price": 80000,
     "images": [
       "/Crop top sports.png"
+    ],
+    "colors": [
+      { "name": "Onyx", "hex": "#1a1a1a" },
+      { "name": "Navy", "hex": "#1d2640" }
     ],
     "sizes": [
       "XS",
@@ -293,6 +326,11 @@
       "/Oversize Tee (alo) front-c.png",
       "/Oversize Tee (alo)back.png"
     ],
+    "colors": [
+      { "name": "Bone", "hex": "#e8e4de", "image": "/Oversize Tee (alo) front-a.png" },
+      { "name": "Stone", "hex": "#9e9690", "image": "/Oversize Tee (alo) front-bpng.png" },
+      { "name": "Carbon", "hex": "#3d3d3d", "image": "/Oversize Tee (alo) front-c.png" }
+    ],
     "sizes": [
       "S",
       "M",
@@ -313,6 +351,10 @@
     "price": 125000,
     "images": [
       "/knitted shirt.png"
+    ],
+    "colors": [
+      { "name": "Ecru", "hex": "#e8e0c8" },
+      { "name": "Onyx", "hex": "#1a1a1a" }
     ],
     "sizes": [
       "S",
@@ -482,6 +524,10 @@
       "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=900&q=85",
       "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=900&q=85",
       "https://images.unsplash.com/photo-1544441893-675973e31985?auto=format&fit=crop&w=900&q=85"
+    ],
+    "colors": [
+      { "name": "Natural", "hex": "#c8bfb9" },
+      { "name": "Onyx", "hex": "#1a1a1a" }
     ],
     "sizes": [
       "One Size"

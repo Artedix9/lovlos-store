@@ -13,6 +13,7 @@ export interface CartItem {
   id: string;       // product id (slug)
   name: string;
   size: string;
+  color?: string;   // e.g. "Onyx"
   price: number;    // TZS
   quantity: number;
   image: string;
@@ -26,7 +27,7 @@ interface CartContextValue {
   /** Add one unit of an item; merges if same id+size already exists */
   addItem: (item: Omit<CartItem, "quantity">) => void;
   /** Apply +1 / -1 delta; removes item when quantity reaches 0 */
-  updateQuantity: (id: string, size: string, delta: number) => void;
+  updateQuantity: (id: string, size: string, color: string | undefined, delta: number) => void;
   /** Empty the cart entirely (called on order placement) */
   clearCart: () => void;
   totalItems: number;
@@ -45,7 +46,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const addItem = useCallback((incoming: Omit<CartItem, "quantity">) => {
     setItems((prev) => {
       const idx = prev.findIndex(
-        (i) => i.id === incoming.id && i.size === incoming.size
+        (i) => i.id === incoming.id && i.size === incoming.size && i.color === incoming.color
       );
       if (idx !== -1) {
         const updated = [...prev];
@@ -59,11 +60,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const clearCart = useCallback(() => setItems([]), []);
 
   const updateQuantity = useCallback(
-    (id: string, size: string, delta: number) => {
+    (id: string, size: string, color: string | undefined, delta: number) => {
       setItems((prev) =>
         prev
           .map((item) =>
-            item.id === id && item.size === size
+            item.id === id && item.size === size && item.color === color
               ? { ...item, quantity: item.quantity + delta }
               : item
           )
