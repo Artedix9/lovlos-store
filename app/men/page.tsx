@@ -81,7 +81,7 @@ export default async function MenPage() {
         {/* Desktop image — wide, visible at md and above */}
         <div className="relative w-full h-[80vh] hidden md:block">
           <Image
-            src="https://images.unsplash.com/photo-1490367532201-b9bc1dc483f6?q=80&w=2070&auto=format&fit=crop"
+            src="/men-hero-banner.jpg"
             alt="Men's collection hero"
             fill
             priority

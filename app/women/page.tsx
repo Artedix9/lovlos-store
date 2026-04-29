@@ -84,7 +84,7 @@ export default async function WomenPage() {
         {/* Desktop image — wide, visible at md and above */}
         <div className="relative w-full h-[80vh] hidden md:block">
           <Image
-            src="https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?q=80&w=2070&auto=format&fit=crop"
+            src="/women-hero-banner01.jpg"
             alt="Women's collection hero"
             fill
             priority
@@ -93,19 +93,23 @@ export default async function WomenPage() {
           />
         </div>
 
-        <div className="absolute inset-0 bg-gradient-to-r from-white/70 via-white/30 to-transparent" />
+        {/* Subtle dark tint so white text stays legible */}
+        <div className="absolute inset-0 bg-black/20" />
 
         <div className="absolute inset-0 flex flex-col justify-end pb-10 md:pb-16 px-5 md:px-16 lg:px-24">
-          <p className="text-xs tracking-ultra uppercase text-charcoal mb-3 font-sans">
+          <p className="text-xs tracking-ultra uppercase text-white/80 mb-3 font-sans">
             Spring / Summer 2025
           </p>
-          <h1 className="font-display text-4xl md:text-8xl font-black uppercase tracking-tight text-primary leading-none mb-4 md:mb-6">
+          <h1 className="font-display text-4xl md:text-8xl font-black uppercase tracking-tight text-white leading-none mb-4 md:mb-6">
             Women
           </h1>
-          <p className="text-sm tracking-wide text-mine mb-8 max-w-xs font-sans font-light leading-relaxed">
+          <p className="text-sm tracking-wide text-white/80 mb-8 max-w-xs font-sans font-light leading-relaxed">
             Thoughtfully crafted pieces that move with you — from studio to street.
           </p>
-          <Link href="/women#products" className="btn-primary self-start">
+          <Link
+            href="/women#products"
+            className="self-start bg-white text-black text-xs tracking-widest uppercase px-6 py-3 hover:bg-white/90 transition-colors duration-200"
+          >
             Shop New Arrivals
           </Link>
         </div>
