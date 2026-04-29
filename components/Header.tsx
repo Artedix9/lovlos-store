@@ -37,8 +37,6 @@ const MEGA_MENUS: Record<string, MegaColumn[]> = {
       heading: "Collections",
       links: [
         { label: "'Good Vibes' Essentials", href: "/women" },
-        { label: "Studio Collection", href: "/women/studio" },
-        { label: "Technical Gear", href: "/women/studio" },
       ],
     },
     {
@@ -46,7 +44,6 @@ const MEGA_MENUS: Record<string, MegaColumn[]> = {
       links: [
         { label: "Bags & Totes", href: "/accessories/bags" },
         { label: "Hats & Caps", href: "/accessories/hats" },
-        { label: "Yoga & Studio", href: "/accessories/yoga" },
         { label: "Shop All", href: "/accessories" },
       ],
     },
@@ -75,8 +72,6 @@ const MEGA_MENUS: Record<string, MegaColumn[]> = {
       heading: "Collections",
       links: [
         { label: "'Good Vibes' Essentials", href: "/men" },
-        { label: "Studio Collection", href: "/men/studio" },
-        { label: "Technical Gear", href: "/men/studio" },
       ],
     },
     {
@@ -108,14 +103,6 @@ const MEGA_MENUS: Record<string, MegaColumn[]> = {
       ],
     },
     {
-      heading: "Yoga & Studio",
-      links: [
-        { label: "Yoga Mats", href: "/accessories/yoga" },
-        { label: "Water Bottles", href: "/accessories/yoga" },
-        { label: "Resistance Bands", href: "/accessories/yoga" },
-      ],
-    },
-    {
       heading: "Lifestyle",
       links: [
         { label: "Socks", href: "/accessories/lifestyle" },
@@ -133,7 +120,6 @@ const NAV_LEFT = [
 ];
 
 const NAV_RIGHT = [
-  { label: "Studio", href: "/studio" },
   { label: "About", href: "/about" },
 ];
 
@@ -142,7 +128,6 @@ const MOBILE_NAV = [
   { label: "Women", href: "/women" },
   { label: "Men", href: "/men" },
   { label: "Accessories", href: "/accessories" },
-  { label: "Studio", href: "/studio" },
   { label: "About", href: "/about" },
 ];
 

@@ -19,7 +19,6 @@ export const metadata: Metadata = {
 const TILES: CategoryTile[] = [
   { label: "Bags", slug: "bags", keywords: ["bag", "tote", "crossbody"], gradient: "from-[#e0d7d1] to-[#c8bfb9]", overlayClass: "bg-primary/0 group-hover:bg-primary/10" },
   { label: "Hats & Caps", slug: "hats", keywords: ["hat", "cap", "beanie"], gradient: "from-[#ddd9d4] to-[#c5c1bc]", overlayClass: "bg-primary/0 group-hover:bg-primary/10" },
-  { label: "Yoga & Studio", slug: "yoga", keywords: ["yoga", "mat", "bottle", "band"], gradient: "from-[#d6d2cc] to-[#b8b4af]", overlayClass: "bg-primary/0 group-hover:bg-primary/10" },
   { label: "Lifestyle", slug: "lifestyle", keywords: ["sock", "belt", "watch"], gradient: "from-[#ceb18f] to-[#b89878]", overlayClass: "bg-primary/0 group-hover:bg-primary/10" },
 ];
 

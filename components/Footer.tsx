@@ -8,10 +8,6 @@ const COLUMNS = [
     heading: "Company",
     links: [
       { label: "About LOVLOS", href: "/about" },
-      { label: "Studio", href: "/studio" },
-      { label: "Sustainability", href: "/sustainability" },
-      { label: "Press", href: "/press" },
-      { label: "Careers", href: "/careers" },
       { label: "Store Locator", href: "/stores" },
     ],
   },
@@ -36,10 +32,10 @@ const COLUMNS = [
   {
     heading: "Follow Us",
     links: [
-      { label: "Instagram", href: "https://instagram.com" },
-      { label: "TikTok", href: "https://tiktok.com" },
-      { label: "Facebook", href: "https://facebook.com" },
-      { label: "Pinterest", href: "https://pinterest.com" },
+      { label: "Instagram", href: "https://www.instagram.com/lovlos.official/" },
+      { label: "TikTok", href: "https://www.tiktok.com/@lovlos.official" },
+      { label: "Pinterest", href: "https://www.pinterest.com/lovlos/" },
+      { label: "Facebook", href: "https://www.facebook.com/profile.php?id=61588690423860" },
     ],
   },
 ];
@@ -88,6 +84,7 @@ export default function Footer() {
                   <li key={link.label}>
                     <Link
                       href={link.href}
+                      {...(link.href.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                       className="text-sm text-white/80 hover:text-white transition-colors duration-200 tracking-wide"
                     >
                       {link.label}

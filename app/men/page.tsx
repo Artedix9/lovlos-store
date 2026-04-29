@@ -35,12 +35,6 @@ const TILES: CategoryTile[] = [
     keywords: ["jacket", "overshirt"],
     image: "https://images.unsplash.com/photo-1544441893-675973e31985?auto=format&fit=crop&w=600&q=80",
   },
-  {
-    label: "Studio",
-    slug: "studio",
-    keywords: ["performance", "track", "studio"],
-    image: "https://images.unsplash.com/photo-1571945153237-4929e783af4a?auto=format&fit=crop&w=600&q=80",
-  },
 ];
 
 export default async function MenPage() {
@@ -100,7 +94,7 @@ export default async function MenPage() {
             Men
           </h1>
           <p className="text-sm tracking-wide text-white/80 mb-8 max-w-xs font-sans font-light leading-relaxed">
-            Refined essentials designed with intention — for the studio, the city, and everything in between.
+            Refined essentials designed with intention — for the city, the streets, and everything in between.
           </p>
           <Link href="/men#products" className="self-start bg-white text-primary text-xs tracking-widest uppercase px-8 py-3 hover:bg-smoke transition-colors duration-200">
             Shop New Arrivals

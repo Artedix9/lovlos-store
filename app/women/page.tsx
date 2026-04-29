@@ -37,13 +37,6 @@ const TILES: CategoryTile[] = [
     image: "https://images.unsplash.com/photo-1551698618-1dfe5d97d256?auto=format&fit=crop&w=600&q=80",
     overlayClass: "bg-primary/15 group-hover:bg-primary/30",
   },
-  {
-    label: "Studio",
-    slug: "studio",
-    keywords: ["sports", "yoga", "studio"],
-    image: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=600&q=80",
-    overlayClass: "bg-primary/15 group-hover:bg-primary/30",
-  },
 ];
 
 export default async function WomenPage() {
@@ -104,7 +97,7 @@ export default async function WomenPage() {
             Women
           </h1>
           <p className="text-sm tracking-wide text-white/80 mb-8 max-w-xs font-sans font-light leading-relaxed">
-            Thoughtfully crafted pieces that move with you — from studio to street.
+            Thoughtfully crafted pieces that move with you — from morning to night.
           </p>
           <Link
             href="/women#products"
