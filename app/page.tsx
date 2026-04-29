@@ -62,9 +62,10 @@ export default async function Home() {
     <main>
       <Header />
       <Hero
-        desktopSrc="/Main Hero Banner-5.png"
+        desktopSrc="/new-banner02.jpg"
         mobileSrc="/Main Hero Banner-Mobile.png"
         isFullScreen={true}
+        darkBackground
       />
 
       {trending.length > 0 && (

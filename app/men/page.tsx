@@ -18,8 +18,8 @@ export const metadata: Metadata = {
 
 const TILES: CategoryTile[] = [
   {
-    label: "T-shirts",
-    slug: "t-shirts",
+    label: "Tops",
+    slug: "tops",
     keywords: ["tee", "polo", "shirt", "hoodie", "crewneck", "sweatshirt"],
     image: "https://images.unsplash.com/photo-1512327536842-5aa37d1ba3e3?auto=format&fit=crop&w=600&q=80",
   },
