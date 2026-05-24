@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { PDPProduct } from "@/lib/products";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -69,6 +69,124 @@ const textareaCls =
   "w-full bg-transparent border border-white/20 text-white px-3 py-2 text-sm focus:outline-none focus:border-white/60 transition-colors placeholder:text-white/20 resize-none";
 const selectCls =
   "w-full bg-[#111] border border-white/20 text-white px-3 py-2.5 text-sm focus:outline-none focus:border-white/60 transition-colors";
+
+// ─── Image Uploader ───────────────────────────────────────────────────────────
+
+function ImageUploader({
+  adminKey,
+  value,
+  onChange,
+}: {
+  adminKey: string;
+  value: string;
+  onChange: (url: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [error, setError] = useState("");
+
+  const upload = async (file: File) => {
+    setError("");
+    setUploading(true);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        headers: { "x-admin-key": adminKey },
+        body,
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Upload failed");
+      onChange(json.url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) upload(file);
+  };
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) upload(file);
+    e.target.value = "";
+  };
+
+  return (
+    <div>
+      <label className="block text-[9px] tracking-[0.25em] uppercase text-white/40 mb-1.5 font-bold">
+        Product Image
+      </label>
+
+      {value ? (
+        <div className="relative border border-white/20 overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={value} alt="Product" className="w-full h-48 object-cover" />
+          <div className="absolute inset-0 bg-black/0 hover:bg-black/50 transition-colors flex items-center justify-center gap-3 opacity-0 hover:opacity-100">
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className="bg-white text-black text-[9px] tracking-[0.25em] uppercase px-4 py-2 font-bold hover:bg-white/90 transition-colors"
+            >
+              REPLACE
+            </button>
+            <button
+              type="button"
+              onClick={() => onChange("")}
+              className="border border-white text-white text-[9px] tracking-[0.25em] uppercase px-4 py-2 hover:bg-white/10 transition-colors"
+            >
+              REMOVE
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          onClick={() => !uploading && inputRef.current?.click()}
+          className={`border-2 border-dashed transition-colors cursor-pointer flex flex-col items-center justify-center gap-2 py-10 ${
+            dragOver ? "border-white/50 bg-white/5" : "border-white/15 hover:border-white/30"
+          } ${uploading ? "cursor-default opacity-60" : ""}`}
+        >
+          {uploading ? (
+            <p className="text-[10px] tracking-[0.25em] uppercase text-white/40">Uploading...</p>
+          ) : (
+            <>
+              <svg className="w-6 h-6 text-white/25" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+              <p className="text-[10px] tracking-[0.2em] uppercase text-white/30">
+                Drag & drop or <span className="text-white/60">browse</span>
+              </p>
+              <p className="text-[9px] text-white/15">JPG, PNG, WEBP — max 5 MB</p>
+            </>
+          )}
+        </div>
+      )}
+
+      {error && <p className="text-red-400/80 text-[10px] tracking-wider mt-1.5">{error}</p>}
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/jpg,image/png,image/webp"
+        onChange={handleFile}
+        className="hidden"
+      />
+    </div>
+  );
+}
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -532,15 +650,11 @@ export default function AdminPage() {
                 </Field>
               </div>
 
-              <Field label="Image URL (first image)">
-                <input
-                  type="text"
-                  value={form.imageUrl}
-                  onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
-                  placeholder="/product.png or https://..."
-                  className={inputCls}
-                />
-              </Field>
+              <ImageUploader
+                adminKey={adminKey}
+                value={form.imageUrl}
+                onChange={(url) => setForm({ ...form, imageUrl: url })}
+              />
 
               <Field label="Description">
                 <textarea
