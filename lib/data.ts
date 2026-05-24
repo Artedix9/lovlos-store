@@ -1,89 +1,43 @@
-import Papa from "papaparse";
-import type { PDPProduct, ProductColor } from "./products";
+import { createClient } from "@supabase/supabase-js";
+import type { PDPProduct } from "./products";
 
-interface RawRow {
-  id: string;
-  name: string;
-  category: string;
-  categoryHref: string;
-  price: string;
-  badge?: string;
-  images: string;   // comma-separated URLs
-  colors?: string;  // JSON string: [{name,hex,image?}, ...]
-  sizes: string;    // comma-separated
-  description: string;
-  materials: string;
-  care: string;
-  isComingSoon: string; // "true" | "false"
+function supabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 }
 
-function parseRow(row: RawRow): PDPProduct {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function fromRow(row: any): PDPProduct {
   return {
-    id: row.id?.trim() ?? "",
-    name: row.name?.trim() ?? "",
-    category: row.category?.trim() ?? "",
-    categoryHref: row.categoryHref?.trim() ?? "",
-    price: Number(row.price) || 0,
-    badge: row.badge?.trim() || undefined,
-    images: (row.images ?? "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean),
-    colors: (() => {
-      const raw = row.colors?.trim();
-      if (!raw) return undefined;
-      try {
-        return JSON.parse(raw) as ProductColor[];
-      } catch {
-        return undefined;
-      }
-    })(),
-    sizes: (row.sizes ?? "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean),
-    description: row.description?.trim() ?? "",
-    materials: row.materials?.trim() ?? "",
-    care: row.care?.trim() ?? "",
-    isComingSoon: row.isComingSoon?.trim().toLowerCase() === "true",
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    categoryHref: row.category_href,
+    price: row.price,
+    badge: row.badge ?? undefined,
+    images: row.images ?? [],
+    colors: row.colors ?? [],
+    sizes: row.sizes ?? [],
+    description: row.description ?? "",
+    materials: row.materials ?? "",
+    care: row.care ?? "",
+    isComingSoon: row.is_coming_soon ?? false,
   };
 }
 
-/**
- * Fetch the product catalogue from the published Google Sheets CSV.
- * Falls back to the static products.json when NEXT_PUBLIC_SHEETS_URL is not set,
- * so local development works without a live sheet.
- *
- * Called from Server Components — the `next.revalidate` option on fetch keeps
- * the cached response warm while allowing hourly refreshes.
- */
 export async function getProducts(): Promise<PDPProduct[]> {
-  const url = process.env.NEXT_PUBLIC_SHEETS_URL?.trim();
+  const { data, error } = await supabase()
+    .from("products")
+    .select("*")
+    .order("sort_order");
 
-  if (!url) {
-    console.warn(
-      "[data] NEXT_PUBLIC_SHEETS_URL is not set — falling back to static products.json"
-    );
+  if (error) {
+    console.error("[data] Supabase error:", error.message);
     const { PRODUCTS } = await import("./products");
     return PRODUCTS;
   }
 
-  const res = await fetch(url, { next: { revalidate: 3600 } });
-  if (!res.ok) {
-    throw new Error(
-      `[data] Failed to fetch product sheet: ${res.status} ${res.statusText}`
-    );
-  }
-
-  const csv = await res.text();
-  const { data, errors } = Papa.parse<RawRow>(csv, {
-    header: true,
-    skipEmptyLines: true,
-  });
-
-  if (errors.length > 0) {
-    console.warn("[data] CSV parse warnings:", errors.slice(0, 3));
-  }
-
-  return data.map(parseRow).filter((p) => Boolean(p.id));
+  return (data ?? []).map(fromRow);
 }

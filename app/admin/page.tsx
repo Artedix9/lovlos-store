@@ -8,19 +8,25 @@ import type { PDPProduct } from "@/lib/products";
 interface FormState {
   name: string;
   category: string;
-  subcategory: string;
   price: string;
-  imageUrl: string;
   badge: string;
+  imageUrl: string;
+  description: string;
+  materials: string;
+  care: string;
+  isComingSoon: boolean;
 }
 
 const DEFAULT_FORM: FormState = {
   name: "",
   category: "Women",
-  subcategory: "",
   price: "",
-  imageUrl: "",
   badge: "",
+  imageUrl: "",
+  description: "",
+  materials: "",
+  care: "",
+  isComingSoon: false,
 };
 
 const CATEGORIES = ["Men", "Women", "Accessories"] as const;
@@ -37,25 +43,32 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
   );
 }
 
-function InputField({
+function Field({
   label,
   required,
-  ...props
-}: React.InputHTMLAttributes<HTMLInputElement> & { label: string; required?: boolean }) {
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <div>
       <label className="block text-[9px] tracking-[0.25em] uppercase text-white/40 mb-1.5 font-bold">
         {label}
         {required && <span className="text-white/30 ml-1">*</span>}
       </label>
-      <input
-        {...props}
-        required={required}
-        className="w-full bg-transparent border border-white/20 text-white px-3 py-2.5 text-sm focus:outline-none focus:border-white/60 transition-colors placeholder:text-white/20"
-      />
+      {children}
     </div>
   );
 }
+
+const inputCls =
+  "w-full bg-transparent border border-white/20 text-white px-3 py-2.5 text-sm focus:outline-none focus:border-white/60 transition-colors placeholder:text-white/20";
+const textareaCls =
+  "w-full bg-transparent border border-white/20 text-white px-3 py-2 text-sm focus:outline-none focus:border-white/60 transition-colors placeholder:text-white/20 resize-none";
+const selectCls =
+  "w-full bg-[#111] border border-white/20 text-white px-3 py-2.5 text-sm focus:outline-none focus:border-white/60 transition-colors";
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -70,15 +83,19 @@ export default function AdminPage() {
   const [products, setProducts] = useState<PDPProduct[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // UI
+  // UI tabs
   const [activeTab, setActiveTab] = useState<"overview" | "inventory">("overview");
+
+  // Modal (shared add / edit)
   const [showModal, setShowModal] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null); // null = add mode
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
 
-  // Restore session on mount
+  // ── Session restore ────────────────────────────────────────────────────────
+
   useEffect(() => {
     const stored = sessionStorage.getItem("lvl-admin-key");
     if (stored) setAdminKey(stored);
@@ -87,9 +104,7 @@ export default function AdminPage() {
   const fetchProducts = useCallback(async (key: string): Promise<boolean> => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/products", {
-        headers: { "x-admin-key": key },
-      });
+      const res = await fetch("/api/admin/products", { headers: { "x-admin-key": key } });
       if (!res.ok) return false;
       setProducts(await res.json());
       return true;
@@ -112,14 +127,12 @@ export default function AdminPage() {
 
   // ── Login ──────────────────────────────────────────────────────────────────
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.BaseSyntheticEvent) => {
     e.preventDefault();
     setLoginLoading(true);
     setLoginError("");
     try {
-      const res = await fetch("/api/admin/products", {
-        headers: { "x-admin-key": inputKey },
-      });
+      const res = await fetch("/api/admin/products", { headers: { "x-admin-key": inputKey } });
       if (res.ok) {
         sessionStorage.setItem("lvl-admin-key", inputKey);
         setAdminKey(inputKey);
@@ -128,7 +141,7 @@ export default function AdminPage() {
         setLoginError("Invalid access key.");
       }
     } catch {
-      setLoginError("Connection error. Is the server running?");
+      setLoginError("Connection error. Try again.");
     } finally {
       setLoginLoading(false);
     }
@@ -141,40 +154,82 @@ export default function AdminPage() {
     setInputKey("");
   };
 
-  // ── Add Product ────────────────────────────────────────────────────────────
+  // ── Modal helpers ──────────────────────────────────────────────────────────
 
-  const handleAdd = async (e: React.FormEvent) => {
+  function openAdd() {
+    setEditId(null);
+    setForm(DEFAULT_FORM);
+    setActionError("");
+    setShowModal(true);
+  }
+
+  function openEdit(p: PDPProduct) {
+    setEditId(p.id);
+    setForm({
+      name: p.name,
+      category: p.category,
+      price: String(p.price),
+      badge: p.badge ?? "",
+      imageUrl: p.images[0] ?? "",
+      description: p.description ?? "",
+      materials: p.materials ?? "",
+      care: p.care ?? "",
+      isComingSoon: p.isComingSoon ?? false,
+    });
+    setActionError("");
+    setShowModal(true);
+  }
+
+  function closeModal() {
+    setShowModal(false);
+    setForm(DEFAULT_FORM);
+    setEditId(null);
+    setActionError("");
+  }
+
+  // ── Save (add or edit) ─────────────────────────────────────────────────────
+
+  const handleSave = async (e: React.BaseSyntheticEvent) => {
     e.preventDefault();
     if (!adminKey) return;
     setSaving(true);
     setActionError("");
+
+    const payload = {
+      ...(editId ? { id: editId } : {}),
+      name: form.name,
+      category: form.category,
+      price: Number(form.price),
+      badge: form.badge || undefined,
+      images: form.imageUrl ? [form.imageUrl] : [],
+      description: form.description,
+      materials: form.materials,
+      care: form.care,
+      isComingSoon: form.isComingSoon,
+    };
+
     try {
       const res = await fetch("/api/admin/products", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-key": adminKey,
-        },
-        body: JSON.stringify({
-          name: form.name,
-          category: form.category,
-          price: Number(form.price),
-          images: form.imageUrl ? [form.imageUrl] : [],
-          badge: form.badge || undefined,
-        }),
+        method: editId ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("Save failed");
-      setShowModal(false);
-      setForm(DEFAULT_FORM);
-      await fetchProducts(adminKey);
+      const saved: PDPProduct = await res.json();
+      if (editId) {
+        setProducts((prev) => prev.map((p) => (p.id === editId ? saved : p)));
+      } else {
+        setProducts((prev) => [...prev, saved]);
+      }
+      closeModal();
     } catch {
-      setActionError("Failed to save product. Try again.");
+      setActionError("Failed to save. Try again.");
     } finally {
       setSaving(false);
     }
   };
 
-  // ── Delete Product ─────────────────────────────────────────────────────────
+  // ── Delete ─────────────────────────────────────────────────────────────────
 
   const handleDelete = async (id: string, name: string) => {
     if (!adminKey) return;
@@ -195,26 +250,23 @@ export default function AdminPage() {
     }
   };
 
-  // ── Derived stats ──────────────────────────────────────────────────────────
+  // ── Stats ──────────────────────────────────────────────────────────────────
 
   const men = products.filter((p) => p.category === "Men").length;
   const women = products.filter((p) => p.category === "Women").length;
   const accessories = products.filter((p) => p.category === "Accessories").length;
   const catalogueValue = products.reduce((sum, p) => sum + p.price, 0);
 
-  // ── Login Screen ───────────────────────────────────────────────────────────
+  // ── Login screen ───────────────────────────────────────────────────────────
 
   if (!adminKey) {
     return (
       <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center p-6">
         <div className="w-full max-w-[340px]">
-          <p className="text-[9px] tracking-[0.5em] uppercase text-white/25 text-center mb-1">
-            LOVLOS
-          </p>
+          <p className="text-[9px] tracking-[0.5em] uppercase text-white/25 text-center mb-1">LOVLOS</p>
           <h1 className="text-xl font-light text-white text-center tracking-[0.35em] uppercase mb-10">
             Admin Access
           </h1>
-
           <form onSubmit={handleLogin} className="space-y-3">
             <input
               type="password"
@@ -226,9 +278,7 @@ export default function AdminPage() {
               className="w-full bg-transparent border border-white/20 text-white placeholder:text-white/20 px-4 py-3 text-xs tracking-widest uppercase focus:outline-none focus:border-white/50 transition-colors"
             />
             {loginError && (
-              <p className="text-red-400/80 text-[10px] tracking-widest text-center">
-                {loginError}
-              </p>
+              <p className="text-red-400/80 text-[10px] tracking-widest text-center">{loginError}</p>
             )}
             <button
               type="submit"
@@ -247,8 +297,6 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
-
-      {/* Top bar */}
       <header className="border-b border-white/[0.08] px-6 md:px-10 h-14 flex items-center justify-between">
         <div className="flex items-center gap-5">
           <span className="text-[10px] tracking-[0.45em] uppercase font-bold">LOVLOS</span>
@@ -264,8 +312,6 @@ export default function AdminPage() {
       </header>
 
       <main className="px-6 md:px-10 py-8 max-w-7xl mx-auto">
-
-        {/* Tab nav */}
         <nav className="flex gap-8 border-b border-white/[0.08] mb-10">
           {(["overview", "inventory"] as const).map((tab) => (
             <button
@@ -282,33 +328,25 @@ export default function AdminPage() {
           ))}
         </nav>
 
-        {/* ── Overview tab ─────────────────────────────────────────────── */}
+        {/* ── Overview ──────────────────────────────────────────────────────── */}
         {activeTab === "overview" && (
           <section>
-            <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-6">
-              Inventory Overview
-            </p>
-
+            <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-6">Inventory Overview</p>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
               <StatCard label="Total Products" value={products.length} />
               <StatCard label="Men's Items" value={men} />
               <StatCard label="Women's Items" value={women} />
               <StatCard label="Accessories" value={accessories} />
             </div>
-
             <div className="border border-white/10 p-6">
-              <p className="text-[9px] tracking-[0.3em] uppercase text-white/30 mb-3">
-                Catalogue Value
-              </p>
-              <p className="text-4xl font-light">
-                TZS {catalogueValue.toLocaleString("en-TZ")}
-              </p>
+              <p className="text-[9px] tracking-[0.3em] uppercase text-white/30 mb-3">Catalogue Value</p>
+              <p className="text-4xl font-light">TZS {catalogueValue.toLocaleString("en-TZ")}</p>
               <p className="text-[10px] text-white/25 mt-1.5">Sum of all listed prices</p>
             </div>
           </section>
         )}
 
-        {/* ── Inventory tab ─────────────────────────────────────────────── */}
+        {/* ── Inventory ─────────────────────────────────────────────────────── */}
         {activeTab === "inventory" && (
           <section>
             <div className="flex items-center justify-between mb-6">
@@ -316,7 +354,7 @@ export default function AdminPage() {
                 {products.length} {products.length === 1 ? "Product" : "Products"}
               </p>
               <button
-                onClick={() => { setShowModal(true); setActionError(""); }}
+                onClick={openAdd}
                 className="bg-white text-black text-[9px] tracking-[0.3em] uppercase px-5 py-2 font-bold hover:bg-white/90 transition-colors"
               >
                 + ADD PRODUCT
@@ -333,10 +371,10 @@ export default function AdminPage() {
               </div>
             ) : (
               <div className="border border-white/[0.08] overflow-x-auto">
-                <table className="w-full min-w-[640px]">
+                <table className="w-full min-w-[700px]">
                   <thead>
                     <tr className="border-b border-white/[0.08]">
-                      {["", "Name", "Category", "Price (TZS)", "Badge", ""].map((h, i) => (
+                      {["", "Name", "Category", "Price (TZS)", "Badge", "Status", ""].map((h, i) => (
                         <th
                           key={i}
                           className="text-left text-[9px] tracking-[0.25em] uppercase text-white/25 px-4 py-3 font-normal"
@@ -352,35 +390,22 @@ export default function AdminPage() {
                         key={p.id}
                         className="border-b border-white/[0.04] hover:bg-white/[0.015] transition-colors group"
                       >
-                        {/* Image */}
                         <td className="px-4 py-3 w-14">
                           <div className="w-10 h-10 bg-white/5 border border-white/10 overflow-hidden flex-shrink-0">
                             {p.images[0] && (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={p.images[0]}
-                                alt={p.name}
-                                className="w-full h-full object-cover"
-                              />
+                              <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover" />
                             )}
                           </div>
                         </td>
-
-                        {/* Name */}
                         <td className="px-4 py-3">
                           <p className="text-sm text-white">{p.name}</p>
                           <p className="text-[9px] text-white/25 mt-0.5 font-mono">{p.id}</p>
                         </td>
-
-                        {/* Category */}
                         <td className="px-4 py-3 text-xs text-white/50">{p.category}</td>
-
-                        {/* Price */}
                         <td className="px-4 py-3 text-xs text-white/50 tabular-nums">
                           {p.price.toLocaleString("en-TZ")}
                         </td>
-
-                        {/* Badge */}
                         <td className="px-4 py-3">
                           {p.badge ? (
                             <span className="text-[9px] tracking-wider uppercase border border-white/20 px-2 py-0.5 text-white/50">
@@ -390,26 +415,35 @@ export default function AdminPage() {
                             <span className="text-white/15">—</span>
                           )}
                         </td>
-
-                        {/* Delete */}
+                        <td className="px-4 py-3">
+                          {p.isComingSoon ? (
+                            <span className="text-[9px] tracking-wider uppercase text-amber-400/60">Coming Soon</span>
+                          ) : (
+                            <span className="text-[9px] tracking-wider uppercase text-emerald-400/60">Live</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={() => handleDelete(p.id, p.name)}
-                            disabled={deletingId === p.id}
-                            className="text-[9px] tracking-[0.2em] uppercase text-red-400/50 hover:text-red-400 transition-colors disabled:opacity-30 opacity-0 group-hover:opacity-100"
-                          >
-                            {deletingId === p.id ? "..." : "DELETE"}
-                          </button>
+                          <div className="flex items-center justify-end gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => openEdit(p)}
+                              className="text-[9px] tracking-[0.2em] uppercase text-white/40 hover:text-white transition-colors"
+                            >
+                              EDIT
+                            </button>
+                            <button
+                              onClick={() => handleDelete(p.id, p.name)}
+                              disabled={deletingId === p.id}
+                              className="text-[9px] tracking-[0.2em] uppercase text-red-400/50 hover:text-red-400 transition-colors disabled:opacity-30"
+                            >
+                              {deletingId === p.id ? "..." : "DELETE"}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
-
                     {products.length === 0 && (
                       <tr>
-                        <td
-                          colSpan={6}
-                          className="px-4 py-20 text-center text-[9px] tracking-[0.3em] uppercase text-white/15"
-                        >
+                        <td colSpan={7} className="px-4 py-20 text-center text-[9px] tracking-[0.3em] uppercase text-white/15">
                           No products yet
                         </td>
                       </tr>
@@ -422,99 +456,121 @@ export default function AdminPage() {
         )}
       </main>
 
-      {/* ── Add Product Modal ─────────────────────────────────────────────── */}
+      {/* ── Add / Edit Modal ───────────────────────────────────────────────── */}
       {showModal && (
         <div
           className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50"
-          onClick={(e) => { if (e.target === e.currentTarget) { setShowModal(false); setForm(DEFAULT_FORM); } }}
+          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
         >
-          <div className="bg-[#111] border border-white/10 w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-none">
-
-            {/* Modal header */}
+          <div className="bg-[#111] border border-white/10 w-full max-w-lg max-h-[90vh] overflow-y-auto scrollbar-none">
             <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.08]">
-              <p className="text-[9px] tracking-[0.35em] uppercase font-bold">New Product</p>
-              <button
-                onClick={() => { setShowModal(false); setForm(DEFAULT_FORM); }}
-                className="text-white/30 hover:text-white transition-colors text-2xl leading-none -mr-1"
-              >
+              <p className="text-[9px] tracking-[0.35em] uppercase font-bold">
+                {editId ? "Edit Product" : "New Product"}
+              </p>
+              <button onClick={closeModal} className="text-white/30 hover:text-white transition-colors text-2xl leading-none -mr-1">
                 ×
               </button>
             </div>
 
-            <form onSubmit={handleAdd} className="px-6 py-6 space-y-4">
-
-              <InputField
-                label="Name"
-                required
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="e.g. High-Waist Legging"
-              />
+            <form onSubmit={handleSave} className="px-6 py-6 space-y-4">
+              <Field label="Name" required>
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="e.g. High-Waist Legging"
+                  required
+                  className={inputCls}
+                />
+              </Field>
 
               <div className="grid grid-cols-2 gap-3">
-                {/* Category */}
-                <div>
-                  <label className="block text-[9px] tracking-[0.25em] uppercase text-white/40 mb-1.5 font-bold">
-                    Category <span className="text-white/30">*</span>
-                  </label>
+                <Field label="Category" required>
                   <select
                     value={form.category}
                     onChange={(e) => setForm({ ...form, category: e.target.value })}
-                    className="w-full bg-[#111] border border-white/20 text-white px-3 py-2.5 text-sm focus:outline-none focus:border-white/60 transition-colors"
+                    className={selectCls}
                   >
-                    {CATEGORIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
+                    {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
-                </div>
-
-                {/* Sub-category */}
-                <InputField
-                  label="Sub-category"
-                  type="text"
-                  value={form.subcategory}
-                  onChange={(e) => setForm({ ...form, subcategory: e.target.value })}
-                  placeholder="e.g. Tops"
-                />
+                </Field>
+                <Field label="Price (TZS)" required>
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.price}
+                    onChange={(e) => setForm({ ...form, price: e.target.value })}
+                    placeholder="85000"
+                    required
+                    className={inputCls}
+                  />
+                </Field>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                {/* Price */}
-                <InputField
-                  label="Price (TZS)"
-                  required
-                  type="number"
-                  min={0}
-                  value={form.price}
-                  onChange={(e) => setForm({ ...form, price: e.target.value })}
-                  placeholder="85000"
-                />
-
-                {/* Badge */}
-                <div>
-                  <label className="block text-[9px] tracking-[0.25em] uppercase text-white/40 mb-1.5 font-bold">
-                    Badge
-                  </label>
+                <Field label="Badge">
                   <select
                     value={form.badge}
                     onChange={(e) => setForm({ ...form, badge: e.target.value })}
-                    className="w-full bg-[#111] border border-white/20 text-white px-3 py-2.5 text-sm focus:outline-none focus:border-white/60 transition-colors"
+                    className={selectCls}
                   >
                     <option value="">None</option>
                     <option value="New">New</option>
                     <option value="Best Seller">Best Seller</option>
                   </select>
-                </div>
+                </Field>
+                <Field label="Status">
+                  <label className="flex items-center gap-2.5 h-[42px] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.isComingSoon}
+                      onChange={(e) => setForm({ ...form, isComingSoon: e.target.checked })}
+                      className="w-3.5 h-3.5 accent-white"
+                    />
+                    <span className="text-xs text-white/60">Coming Soon</span>
+                  </label>
+                </Field>
               </div>
 
-              <InputField
-                label="Image URL"
-                type="text"
-                value={form.imageUrl}
-                onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
-                placeholder="/product.png or https://..."
-              />
+              <Field label="Image URL (first image)">
+                <input
+                  type="text"
+                  value={form.imageUrl}
+                  onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+                  placeholder="/product.png or https://..."
+                  className={inputCls}
+                />
+              </Field>
+
+              <Field label="Description">
+                <textarea
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  placeholder="Product description..."
+                  rows={3}
+                  className={textareaCls}
+                />
+              </Field>
+
+              <Field label="Materials">
+                <textarea
+                  value={form.materials}
+                  onChange={(e) => setForm({ ...form, materials: e.target.value })}
+                  placeholder="e.g. 94% Polyamide, 6% Elastane..."
+                  rows={2}
+                  className={textareaCls}
+                />
+              </Field>
+
+              <Field label="Care">
+                <textarea
+                  value={form.care}
+                  onChange={(e) => setForm({ ...form, care: e.target.value })}
+                  placeholder="e.g. Machine wash cold..."
+                  rows={2}
+                  className={textareaCls}
+                />
+              </Field>
 
               {actionError && (
                 <p className="text-red-400/80 text-[10px] tracking-wider">{actionError}</p>
@@ -523,7 +579,7 @@ export default function AdminPage() {
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => { setShowModal(false); setForm(DEFAULT_FORM); }}
+                  onClick={closeModal}
                   className="flex-1 border border-white/20 text-white/50 text-[9px] tracking-[0.25em] uppercase py-3 hover:border-white/40 hover:text-white/70 transition-colors"
                 >
                   CANCEL
@@ -533,7 +589,7 @@ export default function AdminPage() {
                   disabled={saving}
                   className="flex-1 bg-white text-black text-[9px] tracking-[0.25em] uppercase py-3 font-bold hover:bg-white/90 transition-colors disabled:opacity-40"
                 >
-                  {saving ? "SAVING..." : "SAVE PRODUCT"}
+                  {saving ? "SAVING..." : editId ? "SAVE CHANGES" : "ADD PRODUCT"}
                 </button>
               </div>
             </form>
