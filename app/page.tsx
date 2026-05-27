@@ -1,4 +1,5 @@
 import { getProducts } from "@/lib/data";
+import { getHeroImages } from "@/lib/hero";
 import type { PDPProduct } from "@/lib/products";
 import Header from "@/components/Header";
 import Hero from "@/components/Hero";
@@ -24,7 +25,7 @@ function toCard(p: PDPProduct): Product {
 }
 
 export default async function Home() {
-  const allProducts = await getProducts();
+  const [allProducts, hero] = await Promise.all([getProducts(), getHeroImages("home")]);
   const available = allProducts.filter((p) => !p.isComingSoon);
 
   // Slot 1 — Women with 'New' badge, fallback to first Women
@@ -62,8 +63,8 @@ export default async function Home() {
     <main>
       <Header />
       <Hero
-        desktopSrc="/new-banner02.jpg"
-        mobileSrc="/Main Hero Banner-Mobile.png"
+        desktopSrc={hero.desktop_src}
+        mobileSrc={hero.mobile_src}
         isFullScreen={true}
         darkBackground
       />

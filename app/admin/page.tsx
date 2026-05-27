@@ -352,6 +352,75 @@ function ColorVariationsEditor({
   );
 }
 
+// ─── HeroSlot ─────────────────────────────────────────────────────────────────
+
+function HeroSlot({
+  adminKey,
+  value,
+  label,
+  onChange,
+}: {
+  adminKey: string;
+  value: string;
+  label: string;
+  onChange: (url: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const upload = async (file: File) => {
+    setUploading(true);
+    try {
+      const url = await uploadFile(file, adminKey);
+      onChange(url);
+    } catch {
+      // silent — user can retry
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div>
+      <p className="text-[8px] tracking-[0.25em] uppercase text-white/30 mb-1.5">{label}</p>
+      <div
+        className="relative h-24 w-full border border-dashed border-white/15 overflow-hidden cursor-pointer hover:border-white/35 transition-colors group"
+        onClick={() => !uploading && inputRef.current?.click()}
+      >
+        {value && !uploading ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={value} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <span className="text-[9px] tracking-[0.25em] uppercase text-white font-bold">Replace</span>
+            </div>
+          </>
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+            {uploading ? (
+              <div className="w-4 h-4 border border-white/30 border-t-white/70 rounded-full animate-spin" />
+            ) : (
+              <>
+                <svg className="w-5 h-5 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span className="text-[8px] tracking-wide uppercase text-white/20">Upload</span>
+              </>
+            )}
+          </div>
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          accept={ACCEPT}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }}
+          className="hidden"
+        />
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AdminPage() {
@@ -366,7 +435,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
 
   // UI
-  const [activeTab, setActiveTab] = useState<"overview" | "inventory">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "inventory" | "hero">("overview");
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
@@ -374,11 +443,27 @@ export default function AdminPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
 
+  // Hero images
+  const [heroImages, setHeroImages] = useState<Record<string, { desktop_src: string; mobile_src: string }>>({});
+  const [heroLoading, setHeroLoading] = useState(false);
+  const [heroSaving, setHeroSaving] = useState<string | null>(null);
+  const [heroError, setHeroError] = useState("");
+
   // ── Session restore ────────────────────────────────────────────────────────
 
   useEffect(() => {
     const stored = sessionStorage.getItem("lvl-admin-key");
     if (stored) setAdminKey(stored);
+  }, []);
+
+  const fetchHeroImages = useCallback(async (key: string) => {
+    setHeroLoading(true);
+    try {
+      const res = await fetch("/api/admin/hero", { headers: { "x-admin-key": key } });
+      if (res.ok) setHeroImages(await res.json());
+    } catch { /* silent */ } finally {
+      setHeroLoading(false);
+    }
   }, []);
 
   const fetchProducts = useCallback(async (key: string): Promise<boolean> => {
@@ -403,7 +488,8 @@ export default function AdminPage() {
         setAdminKey(null);
       }
     });
-  }, [adminKey, fetchProducts]);
+    fetchHeroImages(adminKey);
+  }, [adminKey, fetchProducts, fetchHeroImages]);
 
   // ── Login ──────────────────────────────────────────────────────────────────
 
@@ -535,6 +621,26 @@ export default function AdminPage() {
     }
   };
 
+  // ── Hero save ──────────────────────────────────────────────────────────────
+
+  const handleSaveHero = async (page: string) => {
+    if (!adminKey || !heroImages[page]) return;
+    setHeroSaving(page);
+    setHeroError("");
+    try {
+      const res = await fetch("/api/admin/hero", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify({ page, ...heroImages[page] }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setHeroError("Failed to save. Try again.");
+    } finally {
+      setHeroSaving(null);
+    }
+  };
+
   // ── Stats ──────────────────────────────────────────────────────────────────
 
   const men = products.filter((p) => p.category === "Men").length;
@@ -591,7 +697,7 @@ export default function AdminPage() {
 
       <main className="px-6 md:px-10 py-8 max-w-7xl mx-auto">
         <nav className="flex gap-8 border-b border-white/[0.08] mb-10">
-          {(["overview", "inventory"] as const).map((tab) => (
+          {(["overview", "inventory", "hero"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -599,7 +705,7 @@ export default function AdminPage() {
                 activeTab === tab ? "text-white border-b border-white -mb-px" : "text-white/25 hover:text-white/50"
               }`}
             >
-              {tab}
+              {tab === "hero" ? "Hero Images" : tab}
             </button>
           ))}
         </nav>
@@ -710,6 +816,53 @@ export default function AdminPage() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </section>
+        )}
+        {/* ── Hero Images ───────────────────────────────────────────────────── */}
+        {activeTab === "hero" && (
+          <section>
+            <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-2">Hero Banners</p>
+            <p className="text-[9px] text-white/20 mb-8">Upload new images to replace the hero banner on each page. Changes go live immediately.</p>
+
+            {heroError && <p className="text-red-400/80 text-[10px] tracking-wider mb-5">{heroError}</p>}
+
+            {heroLoading ? (
+              <div className="border border-white/[0.08] py-24 text-center text-[9px] tracking-[0.3em] uppercase text-white/20">Loading...</div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {(["home", "women", "men", "accessories"] as const).map((page) => {
+                  const imgs = heroImages[page] ?? { desktop_src: "", mobile_src: "" };
+                  const labels: Record<string, string> = { home: "Home", women: "Women", men: "Men", accessories: "Accessories" };
+                  return (
+                    <div key={page} className="border border-white/10 p-5 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[9px] tracking-[0.35em] uppercase font-bold">{labels[page]}</p>
+                        <button
+                          onClick={() => handleSaveHero(page)}
+                          disabled={heroSaving === page}
+                          className="bg-white text-black text-[8px] tracking-[0.3em] uppercase px-4 py-1.5 font-bold hover:bg-white/90 transition-colors disabled:opacity-40"
+                        >
+                          {heroSaving === page ? "Saving..." : "Save"}
+                        </button>
+                      </div>
+
+                      <HeroSlot
+                        adminKey={adminKey!}
+                        value={imgs.desktop_src}
+                        label="Desktop"
+                        onChange={(url) => setHeroImages((prev) => ({ ...prev, [page]: { ...prev[page], desktop_src: url } }))}
+                      />
+                      <HeroSlot
+                        adminKey={adminKey!}
+                        value={imgs.mobile_src}
+                        label="Mobile"
+                        onChange={(url) => setHeroImages((prev) => ({ ...prev, [page]: { ...prev[page], mobile_src: url } }))}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             )}
           </section>

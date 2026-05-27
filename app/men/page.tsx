@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 import CategoryShell from "@/components/CategoryShell";
 import type { CategoryTile } from "@/components/CategoryShell";
 import { getProducts } from "@/lib/data";
+import { getHeroImages } from "@/lib/hero";
 import type { Product } from "@/components/ProductCard";
 
 export const revalidate = 3600;
@@ -37,7 +38,7 @@ const TILES: CategoryTile[] = [
 ];
 
 export default async function MenPage() {
-  const allProducts = await getProducts();
+  const [allProducts, hero] = await Promise.all([getProducts(), getHeroImages("men")]);
 
   const products: Product[] = allProducts
     .filter((p) => p.category === "Men")
@@ -62,10 +63,10 @@ export default async function MenPage() {
         {/* picture — browser downloads only the matching source */}
         <div className="relative w-full min-h-[80vh] md:h-[80vh]">
           <picture>
-            <source media="(min-width: 768px)" srcSet="/men-hero-banner.jpg" />
+            <source media="(min-width: 768px)" srcSet={hero.desktop_src} />
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="https://images.unsplash.com/photo-1488161628813-04466f872be2?q=80&w=1000&auto=format&fit=crop"
+              src={hero.mobile_src}
               alt="Men's collection hero"
               fetchPriority="high"
               decoding="async"
