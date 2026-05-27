@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 
 interface HeroProps {
   desktopSrc: string;
@@ -9,31 +8,24 @@ interface HeroProps {
 }
 
 export default function Hero({ desktopSrc, mobileSrc, isFullScreen = false, darkBackground = false }: HeroProps) {
+  const heightCls = isFullScreen ? "min-h-[75vh] md:h-[75vh]" : "min-h-[80vh] md:h-[80vh]";
+
   return (
     <section className="relative w-full overflow-hidden bg-smoke">
 
-      {/* Mobile image — visible below md breakpoint */}
-      <div className={`relative w-full md:hidden ${isFullScreen ? "min-h-[75vh]" : "min-h-[80vh]"}`}>
-        <Image
-          src={mobileSrc}
-          alt="LOVLOS — New Season Arrivals"
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover object-center"
-        />
-      </div>
-
-      {/* Desktop image — visible at md and above */}
-      <div className={`relative w-full hidden md:block ${isFullScreen ? "h-[75vh]" : "h-[80vh]"}`}>
-        <Image
-          src={desktopSrc}
-          alt="LOVLOS — New Season Arrivals"
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover object-center"
-        />
+      {/* picture — browser downloads only the matching source */}
+      <div className={`relative ${heightCls}`}>
+        <picture>
+          <source media="(min-width: 768px)" srcSet={desktopSrc} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={mobileSrc}
+            alt="LOVLOS — New Season Arrivals"
+            fetchPriority="high"
+            decoding="async"
+            className="absolute inset-0 w-full h-full object-cover object-center"
+          />
+        </picture>
       </div>
 
       {/* Content overlay */}

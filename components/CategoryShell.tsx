@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import ProductCard from "@/components/ProductCard";
 import type { Product } from "@/components/ProductCard";
@@ -38,20 +38,26 @@ export default function CategoryShell({ products, tiles }: Props) {
     router.replace(url, { scroll: false });
   }
 
-  const activeTile = tiles.find((t) => t.slug === active);
+  const allItems = useMemo(
+    () => [{ label: "All", slug: "all" }, ...tiles],
+    [tiles]
+  );
 
-  const visible =
-    active === "all"
-      ? products
-      : products.filter((p) => {
-          if (!activeTile?.keywords.length) return true;
-          const name = p.name.toLowerCase();
-          return activeTile.keywords.some((k) => name.includes(k));
-        });
+  const activeTile = useMemo(
+    () => tiles.find((t) => t.slug === active),
+    [tiles, active]
+  );
+
+  const visible = useMemo(() => {
+    if (active === "all") return products;
+    if (!activeTile?.keywords.length) return products;
+    return products.filter((p) => {
+      const name = p.name.toLowerCase();
+      return activeTile.keywords.some((k) => name.includes(k));
+    });
+  }, [products, active, activeTile]);
 
   const heading = active === "all" ? "New Arrivals" : (activeTile?.label ?? "New Arrivals");
-
-  const allItems = [{ label: "All", slug: "all" }, ...tiles];
 
   return (
     <section id="products" className="max-w-[1440px] mx-auto px-6 md:px-10 lg:px-16 py-16 md:py-20">

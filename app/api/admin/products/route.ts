@@ -1,37 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import type { PDPProduct } from "@/lib/products";
-
-function supabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-}
+import { getSupabase, fromRow } from "@/lib/supabase";
 
 function checkAuth(req: NextRequest): boolean {
   const secret = process.env.ADMIN_SECRET;
   if (!secret) return false;
   return req.headers.get("x-admin-key") === secret;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function fromRow(row: any): PDPProduct {
-  return {
-    id: row.id,
-    name: row.name,
-    category: row.category,
-    categoryHref: row.category_href,
-    price: row.price,
-    badge: row.badge ?? undefined,
-    images: row.images ?? [],
-    colors: row.colors ?? [],
-    sizes: row.sizes ?? [],
-    description: row.description ?? "",
-    materials: row.materials ?? "",
-    care: row.care ?? "",
-    isComingSoon: row.is_coming_soon ?? false,
-  };
 }
 
 function generateId(name: string): string {
@@ -47,7 +20,7 @@ function generateId(name: string): string {
 export async function GET(req: NextRequest) {
   if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data, error } = await supabase().from("products").select("*").order("sort_order");
+  const { data, error } = await getSupabase().from("products").select("*").order("sort_order");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json((data ?? []).map(fromRow));
 }
@@ -60,7 +33,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "name, category, and price are required" }, { status: 400 });
   }
 
-  const { data: maxData } = await supabase()
+  const db = getSupabase();
+
+  const { data: maxData } = await db
     .from("products")
     .select("sort_order")
     .order("sort_order", { ascending: false })
@@ -84,7 +59,7 @@ export async function POST(req: NextRequest) {
     sort_order: maxSort,
   };
 
-  const { data, error } = await supabase().from("products").insert(row).select().single();
+  const { data, error } = await db.from("products").insert(row).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(fromRow(data), { status: 201 });
 }
@@ -112,7 +87,7 @@ export async function PUT(req: NextRequest) {
   if (body.care !== undefined) updates.care = body.care;
   if (body.isComingSoon !== undefined) updates.is_coming_soon = body.isComingSoon;
 
-  const { data, error } = await supabase()
+  const { data, error } = await getSupabase()
     .from("products")
     .update(updates)
     .eq("id", body.id)
@@ -129,7 +104,7 @@ export async function DELETE(req: NextRequest) {
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
-  const { error } = await supabase().from("products").delete().eq("id", id);
+  const { error } = await getSupabase().from("products").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }

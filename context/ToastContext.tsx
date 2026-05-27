@@ -19,17 +19,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [message, setMessage] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = useCallback((msg: string) => {
-    // Clear any in-flight timer so rapid adds restart the countdown
     if (timerRef.current) clearTimeout(timerRef.current);
+    if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
 
     setMessage(msg);
     setVisible(true);
 
     timerRef.current = setTimeout(() => {
       setVisible(false);
-      timerRef.current = setTimeout(() => setMessage(null), 300); // clear after exit
+      fadeTimerRef.current = setTimeout(() => setMessage(null), 300);
     }, 2500);
   }, []);
 

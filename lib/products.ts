@@ -28,6 +28,8 @@ export function getProduct(id: string): PDPProduct | null {
   return PRODUCTS.find((p) => p.id === id) ?? null;
 }
 
+const _tzsFormatter = new Intl.NumberFormat("en-TZ");
+
 export function formatTZS(amount: number): string {
-  return `TZS ${amount.toLocaleString("en-TZ")}`;
+  return `TZS ${_tzsFormatter.format(amount)}`;
 }

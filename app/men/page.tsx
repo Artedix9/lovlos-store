@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
 import { Suspense } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -60,28 +59,19 @@ export default async function MenPage() {
       {/* ── Hero Banner ── */}
       <section className="relative w-full overflow-hidden bg-smoke">
 
-        {/* Mobile image — portrait, visible below md */}
-        <div className="relative w-full min-h-[80vh] md:hidden">
-          <Image
-            src="https://images.unsplash.com/photo-1488161628813-04466f872be2?q=80&w=1000&auto=format&fit=crop"
-            alt="Men's collection hero"
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover object-center"
-          />
-        </div>
-
-        {/* Desktop image — wide, visible at md and above */}
-        <div className="relative w-full h-[80vh] hidden md:block">
-          <Image
-            src="/men-hero-banner.jpg"
-            alt="Men's collection hero"
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover object-center"
-          />
+        {/* picture — browser downloads only the matching source */}
+        <div className="relative w-full min-h-[80vh] md:h-[80vh]">
+          <picture>
+            <source media="(min-width: 768px)" srcSet="/men-hero-banner.jpg" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://images.unsplash.com/photo-1488161628813-04466f872be2?q=80&w=1000&auto=format&fit=crop"
+              alt="Men's collection hero"
+              fetchPriority="high"
+              decoding="async"
+              className="absolute inset-0 w-full h-full object-cover object-center"
+            />
+          </picture>
         </div>
 
         <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent" />

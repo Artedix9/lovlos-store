@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
@@ -115,7 +115,6 @@ function Lightbox({
           fill
           sizes="(max-width: 768px) 95vw, 600px"
           className="object-contain"
-          priority
         />
       </motion.div>
     </motion.div>
@@ -135,6 +134,11 @@ export default function ProductPageClient({ product }: { product: PDPProduct }) 
   );
 
   const heroImage = selectedColor?.image ?? product.images[0] ?? "";
+
+  const sortedImages = useMemo(
+    () => [heroImage, ...product.images.filter((src) => src !== heroImage)],
+    [heroImage, product.images]
+  );
 
   function handleAddToBag() {
     if (!selectedSize && product.sizes.length > 1) {
@@ -165,7 +169,7 @@ export default function ProductPageClient({ product }: { product: PDPProduct }) 
 
           {/* ══ LEFT — Scrollable image stack ══ */}
           <div className="flex flex-col gap-1">
-            {[heroImage, ...product.images.filter((src) => src !== heroImage)].map((src, i) => (
+            {sortedImages.map((src, i) => (
               <div
                 key={src}
                 className={[

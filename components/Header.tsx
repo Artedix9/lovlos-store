@@ -224,6 +224,12 @@ export default function Header() {
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    };
+  }, []);
+
   return (
     <>
       {/* Announcement Bar */}

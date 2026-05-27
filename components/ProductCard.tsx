@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/context/ToastContext";
+import { formatTZS } from "@/lib/products";
 
 export interface ProductColor {
   name: string;
@@ -22,10 +23,6 @@ export interface Product {
   gradient?: string;   // Tailwind gradient classes — fallback when no image
   colors?: ProductColor[];
   isComingSoon?: boolean;
-}
-
-function formatTZS(amount: number): string {
-  return `TZS ${amount.toLocaleString("en-TZ")}`;
 }
 
 export default function ProductCard({
