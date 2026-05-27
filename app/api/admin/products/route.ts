@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getSupabase, fromRow } from "@/lib/supabase";
+
+function revalidateAll() {
+  revalidatePath("/");
+  revalidatePath("/men");
+  revalidatePath("/women");
+  revalidatePath("/accessories");
+}
 
 function checkAuth(req: NextRequest): boolean {
   const secret = process.env.ADMIN_SECRET;
@@ -61,6 +69,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await db.from("products").insert(row).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  revalidateAll();
   return NextResponse.json(fromRow(data), { status: 201 });
 }
 
@@ -95,6 +104,7 @@ export async function PUT(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  revalidateAll();
   return NextResponse.json(fromRow(data));
 }
 
@@ -106,5 +116,6 @@ export async function DELETE(req: NextRequest) {
 
   const { error } = await getSupabase().from("products").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  revalidateAll();
   return NextResponse.json({ success: true });
 }
