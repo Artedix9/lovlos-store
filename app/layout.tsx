@@ -32,11 +32,6 @@ export const metadata: Metadata = {
     description:
       "High-end streetwear engineered for the vibe. Based in Tanzania, designed for the world.",
   },
-  icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon.ico",
-    apple: "/favicon.ico",
-  },
 };
 
 export default function RootLayout({
