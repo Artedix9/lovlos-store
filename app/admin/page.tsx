@@ -437,6 +437,12 @@ export default function AdminPage() {
   // UI
   const [activeTab, setActiveTab] = useState<"overview" | "inventory" | "hero">("overview");
   const [showModal, setShowModal] = useState(false);
+
+  // Inventory filters
+  const [search, setSearch] = useState("");
+  const [filterCategory, setFilterCategory] = useState<"all" | "Men" | "Women" | "Accessories">("all");
+  const [filterStatus, setFilterStatus] = useState<"all" | "live" | "coming-soon">("all");
+  const [filterBadge, setFilterBadge] = useState<"all" | "New" | "Best Seller" | "none">("all");
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
@@ -641,6 +647,18 @@ export default function AdminPage() {
     }
   };
 
+  // ── Filtered inventory ─────────────────────────────────────────────────────
+
+  const visibleProducts = products.filter((p) => {
+    if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (filterCategory !== "all" && p.category !== filterCategory) return false;
+    if (filterStatus === "live" && p.isComingSoon) return false;
+    if (filterStatus === "coming-soon" && !p.isComingSoon) return false;
+    if (filterBadge === "none" && p.badge) return false;
+    if (filterBadge !== "all" && filterBadge !== "none" && p.badge !== filterBadge) return false;
+    return true;
+  });
+
   // ── Stats ──────────────────────────────────────────────────────────────────
 
   const men = products.filter((p) => p.category === "Men").length;
@@ -731,9 +749,12 @@ export default function AdminPage() {
         {/* ── Inventory ─────────────────────────────────────────────────────── */}
         {activeTab === "inventory" && (
           <section>
-            <div className="flex items-center justify-between mb-6">
+            {/* Toolbar */}
+            <div className="flex items-center justify-between mb-4">
               <p className="text-[9px] tracking-[0.3em] uppercase text-white/25">
-                {products.length} {products.length === 1 ? "Product" : "Products"}
+                {visibleProducts.length === products.length
+                  ? `${products.length} ${products.length === 1 ? "Product" : "Products"}`
+                  : `${visibleProducts.length} of ${products.length}`}
               </p>
               <button
                 onClick={openAdd}
@@ -741,6 +762,91 @@ export default function AdminPage() {
               >
                 + ADD PRODUCT
               </button>
+            </div>
+
+            {/* Filter bar */}
+            <div className="border border-white/[0.08] p-4 mb-6 space-y-3">
+              {/* Search */}
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search products..."
+                className="w-full bg-transparent border border-white/15 text-white text-xs px-3 py-2 focus:outline-none focus:border-white/40 transition-colors placeholder:text-white/20"
+              />
+
+              {/* Pills row */}
+              <div className="flex flex-wrap gap-4">
+                {/* Category */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[8px] tracking-[0.25em] uppercase text-white/20 shrink-0">Category</span>
+                  <div className="flex gap-1">
+                    {(["all", "Men", "Women", "Accessories"] as const).map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => setFilterCategory(v)}
+                        className={`text-[8px] tracking-[0.2em] uppercase px-2.5 py-1 transition-colors border ${
+                          filterCategory === v
+                            ? "border-white/60 text-white bg-white/10"
+                            : "border-white/15 text-white/30 hover:border-white/30 hover:text-white/50"
+                        }`}
+                      >
+                        {v === "all" ? "All" : v}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Status */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[8px] tracking-[0.25em] uppercase text-white/20 shrink-0">Status</span>
+                  <div className="flex gap-1">
+                    {([["all", "All"], ["live", "Live"], ["coming-soon", "Coming Soon"]] as const).map(([v, label]) => (
+                      <button
+                        key={v}
+                        onClick={() => setFilterStatus(v)}
+                        className={`text-[8px] tracking-[0.2em] uppercase px-2.5 py-1 transition-colors border ${
+                          filterStatus === v
+                            ? "border-white/60 text-white bg-white/10"
+                            : "border-white/15 text-white/30 hover:border-white/30 hover:text-white/50"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Badge */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[8px] tracking-[0.25em] uppercase text-white/20 shrink-0">Badge</span>
+                  <div className="flex gap-1">
+                    {([["all", "All"], ["New", "New"], ["Best Seller", "Best Seller"], ["none", "None"]] as const).map(([v, label]) => (
+                      <button
+                        key={v}
+                        onClick={() => setFilterBadge(v)}
+                        className={`text-[8px] tracking-[0.2em] uppercase px-2.5 py-1 transition-colors border ${
+                          filterBadge === v
+                            ? "border-white/60 text-white bg-white/10"
+                            : "border-white/15 text-white/30 hover:border-white/30 hover:text-white/50"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Clear — only shown when any filter is active */}
+                {(search || filterCategory !== "all" || filterStatus !== "all" || filterBadge !== "all") && (
+                  <button
+                    onClick={() => { setSearch(""); setFilterCategory("all"); setFilterStatus("all"); setFilterBadge("all"); }}
+                    className="text-[8px] tracking-[0.2em] uppercase text-white/25 hover:text-white/50 transition-colors ml-auto"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
             </div>
 
             {actionError && <p className="text-red-400/80 text-[10px] tracking-wider mb-4">{actionError}</p>}
@@ -758,7 +864,7 @@ export default function AdminPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {products.map((p) => (
+                    {visibleProducts.map((p) => (
                       <tr key={p.id} className="border-b border-white/[0.04] hover:bg-white/[0.015] transition-colors group">
                         <td className="px-4 py-3 w-14">
                           <div className="w-10 h-10 bg-white/5 border border-white/10 overflow-hidden flex-shrink-0">
@@ -809,9 +915,11 @@ export default function AdminPage() {
                         </td>
                       </tr>
                     ))}
-                    {products.length === 0 && (
+                    {visibleProducts.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="px-4 py-20 text-center text-[9px] tracking-[0.3em] uppercase text-white/15">No products yet</td>
+                        <td colSpan={7} className="px-4 py-20 text-center text-[9px] tracking-[0.3em] uppercase text-white/15">
+                          {products.length === 0 ? "No products yet" : "No products match the current filters"}
+                        </td>
                       </tr>
                     )}
                   </tbody>
