@@ -14,6 +14,7 @@ export default function AboutPage() {
   return (
     <>
       <Header />
+      <main id="main-content">
 
       {/* ── Hero — full viewport, centred ── */}
       <section className="w-full h-screen bg-zinc-950 flex flex-col items-center justify-center px-8 overflow-hidden gap-8 md:gap-10">
@@ -116,6 +117,7 @@ export default function AboutPage() {
         </Link>
       </section>
 
+      </main>
       <Footer />
     </>
   );

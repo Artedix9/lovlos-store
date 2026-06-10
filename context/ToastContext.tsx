@@ -38,41 +38,38 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={{ showToast }}>
       {children}
 
-      {/* Toast — fixed bottom-center, Onyx theme */}
       {message && (
         <div
           role="status"
           aria-live="polite"
+          aria-atomic="true"
           style={{ transitionDuration: "250ms" }}
           className={[
             "fixed bottom-8 left-1/2 -translate-x-1/2 z-[300]",
-            "bg-zinc-950 text-white",
-            "px-6 py-3.5 shadow-xl",
-            "flex items-center gap-3",
+            "bg-primary text-white",
+            "px-5 py-3 shadow-level-3 max-w-xs w-max",
+            "flex items-center gap-2.5",
             "transition-all ease-out",
             visible
               ? "opacity-100 translate-y-0"
               : "opacity-0 translate-y-2 pointer-events-none",
           ].join(" ")}
         >
-          {/* Checkmark */}
           <svg
-            width="14"
-            height="14"
+            width="13"
+            height="13"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
             strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="text-white shrink-0"
+            className="text-white/70 shrink-0"
             aria-hidden="true"
           >
             <polyline points="20 6 9 17 4 12" />
           </svg>
-          <p className="text-xs font-bold uppercase tracking-widest whitespace-nowrap">
-            {message}
-          </p>
+          <p className="text-xs tracking-wide leading-snug">{message}</p>
         </div>
       )}
     </ToastContext.Provider>

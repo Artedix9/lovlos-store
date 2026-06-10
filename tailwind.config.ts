@@ -23,7 +23,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["var(--font-inter)", "Helvetica", "sans-serif"],
-        display: ["var(--font-inter)", "Helvetica", "sans-serif"],
+        display: ["var(--font-cormorant)", "Georgia", "serif"],
       },
       letterSpacing: {
         widest: "0.2em",
@@ -42,6 +42,9 @@ const config: Config = {
         "4xl": "56px",
         "5xl": "64px",
         "9xl": "120px",
+      },
+      transitionDuration: {
+        "400": "400ms",
       },
       boxShadow: {
         "level-1": "0 2px 6px 0 rgb(0 0 0 / 0.06), 0 4px 12px 0 rgb(35 41 54 / 0.08)",

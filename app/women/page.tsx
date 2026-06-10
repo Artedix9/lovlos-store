@@ -58,6 +58,7 @@ export default async function WomenPage() {
   return (
     <>
       <Header />
+      <main id="main-content">
 
       {/* ── Hero Banner ── */}
       <section className="relative w-full overflow-hidden bg-smoke">
@@ -104,6 +105,7 @@ export default async function WomenPage() {
         <CategoryShell products={products} tiles={TILES} />
       </Suspense>
 
+      </main>
       <Footer />
     </>
   );

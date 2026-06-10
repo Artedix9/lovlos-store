@@ -19,7 +19,7 @@ function SuccessContent() {
   const orderId = searchParams.get("orderId") ?? "";
 
   return (
-    <main className="min-h-screen bg-white flex flex-col">
+    <main id="main-content" className="min-h-screen bg-white flex flex-col">
 
       {/* Minimal top bar */}
       <div className="border-b border-mercury px-6 md:px-10 py-4 flex items-center justify-between">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
@@ -10,7 +10,7 @@ import { formatTZS, type PDPProduct, type ProductColor } from "@/lib/products";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/context/ToastContext";
 
-/* ── Accordion item ── */
+/* ── Accordion — CSS Grid rows animation (no arbitrary maxHeight) ── */
 function AccordionItem({
   label,
   children,
@@ -31,7 +31,7 @@ function AccordionItem({
           {label}
         </span>
         <span
-          className="text-lg leading-none text-chicago transition-transform duration-300"
+          className="text-lg leading-none text-chicago transition-transform duration-300 ease-in-out"
           style={{ transform: open ? "rotate(45deg)" : "rotate(0deg)" }}
           aria-hidden="true"
         >
@@ -39,12 +39,15 @@ function AccordionItem({
         </span>
       </button>
 
+      {/* CSS Grid rows animation — collapses to 0fr without arbitrary maxHeight */}
       <div
-        className="overflow-hidden transition-all duration-400 ease-in-out"
-        style={{ maxHeight: open ? "600px" : "0px" }}
+        className="grid transition-all duration-400 ease-in-out"
+        style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
       >
-        <div className="pb-5 text-sm text-mine leading-relaxed tracking-wide">
-          {children}
+        <div className="overflow-hidden">
+          <div className="pb-5 text-sm text-mine leading-relaxed tracking-wide">
+            {children}
+          </div>
         </div>
       </div>
     </div>
@@ -81,7 +84,7 @@ function Lightbox({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
-      className="fixed inset-0 z-[500] bg-zinc-950/95 flex items-center justify-center p-4 md:p-10"
+      className="fixed inset-0 z-[500] bg-primary/95 flex items-center justify-center p-4 md:p-10"
       onClick={onClose}
       aria-modal="true"
       role="dialog"
@@ -90,7 +93,7 @@ function Lightbox({
       <button
         onClick={onClose}
         aria-label="Close lightbox"
-        className="absolute top-5 right-6 text-zinc-400 hover:text-white transition-colors duration-200 z-10"
+        className="absolute top-5 right-6 text-white/40 hover:text-white transition-colors duration-200 z-10"
       >
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
@@ -132,6 +135,8 @@ export default function ProductPageClient({ product }: { product: PDPProduct }) 
   const [selectedColor, setSelectedColor] = useState<ProductColor | null>(
     product.colors?.[0] ?? null
   );
+  const [activeSlide, setActiveSlide] = useState(0);
+  const carouselRef = useRef<HTMLDivElement>(null);
 
   const heroImage = selectedColor?.image ?? product.images[0] ?? "";
 
@@ -139,6 +144,31 @@ export default function ProductPageClient({ product }: { product: PDPProduct }) 
     () => [heroImage, ...product.images.filter((src) => src !== heroImage)],
     [heroImage, product.images]
   );
+
+  /* Sync carousel to active slide on color change */
+  useEffect(() => {
+    setActiveSlide(0);
+    if (carouselRef.current) {
+      carouselRef.current.scrollTo({ left: 0, behavior: "instant" });
+    }
+  }, [selectedColor]);
+
+  function handleCarouselScroll() {
+    if (!carouselRef.current) return;
+    const idx = Math.round(
+      carouselRef.current.scrollLeft / carouselRef.current.clientWidth
+    );
+    setActiveSlide(idx);
+  }
+
+  function scrollToSlide(idx: number) {
+    if (!carouselRef.current) return;
+    carouselRef.current.scrollTo({
+      left: idx * carouselRef.current.clientWidth,
+      behavior: "smooth",
+    });
+    setActiveSlide(idx);
+  }
 
   function handleAddToBag() {
     if (!selectedSize && product.sizes.length > 1) {
@@ -154,7 +184,9 @@ export default function ProductPageClient({ product }: { product: PDPProduct }) 
       image: heroImage,
     });
     openCart();
-    showToast(`${product.name}${selectedColor ? ` — ${selectedColor.name}` : ""} added to bag.`);
+    showToast(
+      `${product.name}${selectedColor ? ` — ${selectedColor.name}` : ""} added to bag.`
+    );
     setSizeError(false);
     setAdded(true);
     setTimeout(() => setAdded(false), 2200);
@@ -164,68 +196,128 @@ export default function ProductPageClient({ product }: { product: PDPProduct }) 
     <>
       <Header />
 
-      <main>
+      <main id="main-content">
         <div className="lg:grid lg:grid-cols-2 lg:min-h-screen">
 
-          {/* ══ LEFT — Scrollable image stack ══ */}
-          <div className="flex flex-col gap-1">
-            {sortedImages.map((src, i) => (
-              <div
-                key={src}
-                className={[
-                  "relative w-full aspect-[4/5] bg-smoke overflow-hidden",
-                  product.isComingSoon ? "cursor-default" : "cursor-zoom-in",
-                ].join(" ")}
-                onClick={() => !product.isComingSoon && setLightboxSrc(src)}
-                role={product.isComingSoon ? undefined : "button"}
-                aria-label={product.isComingSoon ? undefined : `View ${product.name} — image ${i + 1} fullscreen`}
-                tabIndex={product.isComingSoon ? undefined : 0}
-                onKeyDown={(e) => !product.isComingSoon && e.key === "Enter" && setLightboxSrc(src)}
-              >
-                <Image
-                  src={src}
-                  alt={`${product.name} — view ${i + 1}`}
-                  fill
-                  priority={i === 0}
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                  className={[
-                    "object-cover object-top transition-transform duration-700 ease-out",
-                    product.isComingSoon ? "" : "hover:scale-105",
-                  ].join(" ")}
-                />
-                {product.isComingSoon && i === 0 && (
-                  <div className="absolute inset-0 z-10 flex items-center justify-center backdrop-blur-md bg-black/40">
-                    <p className="text-white font-black uppercase tracking-[0.2em] text-base md:text-lg">
-                      Coming Soon
-                    </p>
-                  </div>
-                )}
+          {/* ══ LEFT — Images ══ */}
+          <div>
+            {/* Mobile: horizontal scroll-snap carousel */}
+            <div
+              ref={carouselRef}
+              onScroll={handleCarouselScroll}
+              className="lg:hidden flex overflow-x-auto scrollbar-none snap-x snap-mandatory"
+              aria-label="Product images"
+            >
+              {sortedImages.map((src, i) => (
+                <div
+                  key={src + i}
+                  className="relative w-full shrink-0 aspect-[4/5] snap-center bg-smoke"
+                  onClick={() => !product.isComingSoon && setLightboxSrc(src)}
+                  role={product.isComingSoon ? undefined : "button"}
+                  aria-label={product.isComingSoon ? undefined : `View image ${i + 1} fullscreen`}
+                  tabIndex={product.isComingSoon ? undefined : 0}
+                  onKeyDown={(e) => !product.isComingSoon && e.key === "Enter" && setLightboxSrc(src)}
+                  style={{ cursor: product.isComingSoon ? "default" : "zoom-in" }}
+                >
+                  <Image
+                    src={src}
+                    alt={`${product.name} — image ${i + 1}`}
+                    fill
+                    priority={i === 0}
+                    sizes="100vw"
+                    className="object-cover object-top"
+                  />
+                  {product.isComingSoon && i === 0 && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-primary/70">
+                      <p className="text-white font-bold uppercase tracking-[0.25em] text-sm">
+                        Coming Soon
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Dot indicators — mobile only */}
+            {sortedImages.length > 1 && (
+              <div className="lg:hidden flex justify-center items-center gap-2 py-4" aria-label="Image navigation">
+                {sortedImages.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => scrollToSlide(i)}
+                    aria-label={`Go to image ${i + 1}`}
+                    aria-current={i === activeSlide ? "true" : undefined}
+                    className={[
+                      "rounded-full transition-all duration-200",
+                      i === activeSlide
+                        ? "w-4 h-1.5 bg-primary"
+                        : "w-1.5 h-1.5 bg-mercury hover:bg-chicago",
+                    ].join(" ")}
+                  />
+                ))}
               </div>
-            ))}
+            )}
+
+            {/* Desktop: vertical stack */}
+            <div className="hidden lg:flex flex-col gap-1">
+              {sortedImages.map((src, i) => (
+                <div
+                  key={src + i}
+                  className={[
+                    "relative w-full aspect-[4/5] bg-smoke overflow-hidden",
+                    product.isComingSoon ? "cursor-default" : "cursor-zoom-in",
+                  ].join(" ")}
+                  onClick={() => !product.isComingSoon && setLightboxSrc(src)}
+                  role={product.isComingSoon ? undefined : "button"}
+                  aria-label={product.isComingSoon ? undefined : `View image ${i + 1} fullscreen`}
+                  tabIndex={product.isComingSoon ? undefined : 0}
+                  onKeyDown={(e) => !product.isComingSoon && e.key === "Enter" && setLightboxSrc(src)}
+                >
+                  <Image
+                    src={src}
+                    alt={`${product.name} — view ${i + 1}`}
+                    fill
+                    priority={i === 0}
+                    sizes="50vw"
+                    className={[
+                      "object-cover object-top transition-transform duration-700 ease-out",
+                      product.isComingSoon ? "" : "hover:scale-105",
+                    ].join(" ")}
+                  />
+                  {product.isComingSoon && i === 0 && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-primary/70">
+                      <p className="text-white font-bold uppercase tracking-[0.25em] text-base md:text-lg">
+                        Coming Soon
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* ══ RIGHT — Sticky product details ══ */}
-          <div className="lg:sticky lg:top-16 lg:self-start lg:h-[calc(100vh-4rem)] flex flex-col">
-            <div className="overflow-y-auto flex-1 px-8 md:px-12 lg:px-14 py-10 lg:py-14">
+          <div className="lg:sticky lg:self-start lg:h-[calc(100vh-var(--shell-top))] flex flex-col" style={{ top: "var(--shell-top)" }}>
+            <div className="overflow-y-auto flex-1 px-6 md:px-10 lg:px-14 py-8 lg:py-12">
 
               {/* Breadcrumb */}
-              <nav className="flex items-center gap-2 mb-8 text-[10px] tracking-widest uppercase text-chicago">
+              <nav className="flex items-center gap-2 mb-6 text-[10px] tracking-widest uppercase text-chicago" aria-label="Breadcrumb">
                 <Link href="/" className="hover:text-primary transition-colors duration-200">Home</Link>
-                <span>/</span>
+                <span aria-hidden="true">/</span>
                 <Link href={product.categoryHref} className="hover:text-primary transition-colors duration-200">
                   {product.category}
                 </Link>
-                <span>/</span>
-                <span className="text-primary">{product.name}</span>
+                <span aria-hidden="true">/</span>
+                <span className="text-primary" aria-current="page">{product.name}</span>
               </nav>
 
               {product.badge && (
-                <span className="inline-block bg-primary text-white text-[10px] tracking-widest uppercase px-2.5 py-1 mb-4">
+                <span className="inline-block bg-primary text-white text-[10px] tracking-widest uppercase px-2.5 py-1 mb-4 font-bold">
                   {product.badge}
                 </span>
               )}
 
-              <h1 className="font-display text-4xl md:text-5xl font-black uppercase tracking-tight text-primary leading-tight mb-2">
+              <h1 className="font-display text-4xl md:text-5xl font-bold uppercase tracking-tight text-primary leading-tight mb-2">
                 {product.name}
               </h1>
 
@@ -233,33 +325,34 @@ export default function ProductPageClient({ product }: { product: PDPProduct }) 
                 Good vibes defined.
               </p>
 
-              <p className="font-display text-2xl font-bold text-primary mb-6">
+              <p className="font-display text-2xl font-semibold text-primary mb-6">
                 {formatTZS(product.price)}
               </p>
 
               {/* Color swatches */}
               {product.colors && product.colors.length > 1 && (
                 <div className="mb-7">
-                  <span className="text-xs tracking-widest uppercase text-primary">
+                  <p className="text-xs tracking-widest uppercase text-primary mb-3">
                     Colour
                     {selectedColor && (
                       <span className="ml-2 font-normal text-chicago normal-case tracking-normal">
                         — {selectedColor.name}
                       </span>
                     )}
-                  </span>
-                  <div className="flex gap-2.5 mt-3">
+                  </p>
+                  <div className="flex gap-2.5" role="group" aria-label="Select colour">
                     {product.colors.map((color) => (
                       <button
                         key={color.name}
                         title={color.name}
                         onClick={() => setSelectedColor(color)}
-                        aria-label={color.name}
+                        aria-label={`${color.name}${selectedColor?.name === color.name ? " (selected)" : ""}`}
                         aria-pressed={selectedColor?.name === color.name}
                         className={[
-                          "w-6 h-6 rounded-full border transition-all duration-150 focus:outline-none",
+                          "w-6 h-6 rounded-full border transition-all duration-150",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary",
                           selectedColor?.name === color.name
-                            ? "ring-2 ring-offset-2 ring-primary"
+                            ? "ring-2 ring-offset-2 ring-primary border-transparent"
                             : "border-transparent hover:ring-2 hover:ring-offset-2 hover:ring-chicago",
                         ].join(" ")}
                         style={{ backgroundColor: color.hex }}
@@ -269,40 +362,44 @@ export default function ProductPageClient({ product }: { product: PDPProduct }) 
                 </div>
               )}
 
-              <div className="w-8 h-px bg-mercury mb-8" aria-hidden="true" />
+              <div className="w-8 h-px bg-mercury mb-7" aria-hidden="true" />
 
-              {/* Size selector */}
+              {/* Size selector — correct ARIA: radiogroup + radio */}
               {product.sizes.length > 1 && (
                 <div className="mb-7">
                   <div className="flex items-baseline justify-between mb-3">
-                    <span className="text-xs tracking-widest uppercase text-primary">
+                    <p className="text-xs tracking-widest uppercase text-primary">
                       Size
                       {selectedSize && (
                         <span className="ml-2 font-normal text-chicago normal-case tracking-normal">
                           — {selectedSize}
                         </span>
                       )}
-                    </span>
-                    <button className="text-[11px] tracking-widest uppercase text-chicago underline underline-offset-2 hover:text-primary transition-colors duration-200">
+                    </p>
+                    <button className="text-[11px] tracking-widest uppercase text-chicago underline underline-offset-2 hover:text-primary transition-colors duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:ring-offset-1">
                       Size Guide
                     </button>
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
+                  <div
+                    role="radiogroup"
+                    aria-label="Select size"
+                    aria-required="true"
+                    className="flex flex-wrap gap-2"
+                  >
                     {product.sizes.map((size) => (
                       <button
                         key={size}
-                        onClick={() => {
-                          setSelectedSize(size);
-                          setSizeError(false);
-                        }}
+                        role="radio"
+                        aria-checked={selectedSize === size}
+                        onClick={() => { setSelectedSize(size); setSizeError(false); }}
                         className={[
                           "w-14 h-11 text-xs tracking-widest uppercase border transition-colors duration-150",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1",
                           selectedSize === size
                             ? "bg-primary text-white border-primary"
                             : "bg-white text-primary border-mercury hover:border-primary",
                         ].join(" ")}
-                        aria-pressed={selectedSize === size}
                       >
                         {size}
                       </button>
@@ -310,14 +407,14 @@ export default function ProductPageClient({ product }: { product: PDPProduct }) 
                   </div>
 
                   {sizeError && (
-                    <p className="mt-2 text-xs text-[#b00020] tracking-wide">
+                    <p role="alert" className="mt-2 text-xs text-red-600 tracking-wide">
                       Please select a size to continue.
                     </p>
                   )}
                 </div>
               )}
 
-              {/* Add to Bag / Coming Soon */}
+              {/* Add to Bag */}
               {product.isComingSoon ? (
                 <button
                   disabled
@@ -330,8 +427,9 @@ export default function ProductPageClient({ product }: { product: PDPProduct }) 
                   onClick={handleAddToBag}
                   className={[
                     "w-full py-4 text-xs tracking-widest uppercase transition-all duration-200",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
                     added
-                      ? "bg-[#758e6d] text-white"
+                      ? "bg-[#4a6741] text-white"
                       : "bg-primary text-white hover:bg-charcoal",
                   ].join(" ")}
                 >
@@ -360,7 +458,12 @@ export default function ProductPageClient({ product }: { product: PDPProduct }) 
                     <li className="pt-1">Standard delivery: 2–4 business days within Dar es Salaam.</li>
                     <li>Upcountry delivery: 4–7 business days depending on location.</li>
                     <li className="pt-1">Payment via M-Pesa, Tigo Pesa, Airtel Money, or Cash on Delivery.</li>
-                    <li className="pt-1 text-chicago">Returns accepted within 14 days of delivery. Items must be unworn and in original condition. <Link href="/shipping" className="underline underline-offset-2 hover:text-primary transition-colors duration-200">Full returns policy →</Link></li>
+                    <li className="pt-1 text-chicago">
+                      Returns accepted within 14 days of delivery. Items must be unworn and in original condition.{" "}
+                      <Link href="/shipping" className="underline underline-offset-2 hover:text-primary transition-colors duration-200">
+                        Full returns policy →
+                      </Link>
+                    </li>
                   </ul>
                 </AccordionItem>
 

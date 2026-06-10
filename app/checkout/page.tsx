@@ -186,7 +186,7 @@ export default function CheckoutPage() {
     <>
       <Header />
 
-      <main className="min-h-screen bg-[#FDFDFD]">
+      <main id="main-content" className="min-h-screen bg-[#FDFDFD]">
         <div className="max-w-7xl mx-auto px-6 md:px-10 lg:px-16 py-14">
 
           {/* Page title */}

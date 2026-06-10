@@ -15,6 +15,11 @@
   --sand: #e0d7d1;
   --highlight-light: #f1e8dd;
   --highlight-medium: #ceb18f;
+
+  /* Layout measurements — keep in sync with header markup */
+  --announce-h: 36px;
+  --header-h: 64px;
+  --shell-top: calc(var(--announce-h) + var(--header-h) + 16px);
 }
 
 @layer base {
@@ -30,6 +35,7 @@
     -moz-osx-font-smoothing: grayscale;
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
   }
 
   body {
@@ -37,9 +43,28 @@
     background-color: var(--white);
     font-family: var(--font-inter), Helvetica, sans-serif;
   }
+
+  /* Global keyboard focus ring — applies only on keyboard navigation */
+  :focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+
+  /* Remove browser outline when not keyboard-navigating */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
 }
 
 @layer utilities {
+  /* Skip navigation — visually hidden, becomes visible on keyboard focus */
+  .skip-nav {
+    @apply sr-only focus:not-sr-only;
+    @apply fixed top-3 left-3 z-[9999];
+    @apply bg-primary text-white text-xs tracking-widest uppercase;
+    @apply px-4 py-2.5;
+  }
+
   .scrollbar-none {
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -54,13 +79,18 @@
 
   .nav-link {
     @apply text-xs tracking-widest uppercase text-primary transition-colors duration-200 hover:text-chicago;
+    @apply rounded-sm;
   }
 
   .btn-primary {
-    @apply bg-primary text-white text-xs tracking-widest uppercase px-8 py-3 transition-colors duration-200 hover:bg-charcoal;
+    @apply inline-block bg-primary text-white text-xs tracking-widest uppercase px-8 py-3;
+    @apply transition-colors duration-200 hover:bg-charcoal;
+    @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary;
   }
 
   .btn-outline {
-    @apply border border-primary text-primary text-xs tracking-widest uppercase px-8 py-3 transition-colors duration-200 hover:bg-primary hover:text-white;
+    @apply inline-block border border-primary text-primary text-xs tracking-widest uppercase px-8 py-3;
+    @apply transition-colors duration-200 hover:bg-primary hover:text-white;
+    @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary;
   }
 }

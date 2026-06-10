@@ -41,6 +41,7 @@ export default async function AccessoriesPage() {
   return (
     <>
       <Header />
+      <main id="main-content">
 
       {/* ── Hero Banner ── */}
       <section className="relative w-full overflow-hidden bg-smoke">
@@ -83,6 +84,7 @@ export default async function AccessoriesPage() {
         <CategoryShell products={products} tiles={TILES} />
       </Suspense>
 
+      </main>
       <Footer />
     </>
   );

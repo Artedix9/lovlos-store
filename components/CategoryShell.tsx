@@ -61,53 +61,68 @@ export default function CategoryShell({ products, tiles }: Props) {
 
   return (
     <section id="products" className="max-w-[1440px] mx-auto px-6 md:px-10 lg:px-16 py-16 md:py-20">
-      {/* ── Mobile: horizontal scroll filter bar ── */}
-      <div
-        ref={scrollRef}
-        className="md:hidden flex gap-6 overflow-x-auto pb-4 mb-8 scrollbar-none"
-      >
-        {allItems.map((item) => {
-          const isActive = active === item.slug;
-          return (
-            <button
-              key={item.slug}
-              onClick={() => select(item.slug)}
-              className={[
-                "shrink-0 text-xs tracking-widest uppercase whitespace-nowrap transition-colors duration-150 font-sans pb-1 border-b",
-                isActive
-                  ? "text-primary border-primary font-semibold"
-                  : "text-chicago border-transparent hover:text-primary",
-              ].join(" ")}
-            >
-              {item.label}
-            </button>
-          );
-        })}
+
+      {/* ── Mobile: horizontal scroll filter bar with fade hint ── */}
+      <div className="md:hidden relative mb-8">
+        {/* Right-edge fade indicates horizontal scroll */}
+        <div
+          className="pointer-events-none absolute right-0 top-0 bottom-4 w-10 z-10"
+          style={{ background: "linear-gradient(to left, white, transparent)" }}
+          aria-hidden="true"
+        />
+        <div
+          ref={scrollRef}
+          className="flex gap-6 overflow-x-auto pb-4 pr-10 scrollbar-none"
+          role="tablist"
+          aria-label="Filter by category"
+        >
+          {allItems.map((item) => {
+            const isActive = active === item.slug;
+            return (
+              <button
+                key={item.slug}
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => select(item.slug)}
+                className={[
+                  "shrink-0 text-xs tracking-widest uppercase whitespace-nowrap transition-colors duration-150 font-sans pb-1 border-b",
+                  isActive
+                    ? "text-primary border-primary font-semibold"
+                    : "text-chicago border-transparent hover:text-primary",
+                ].join(" ")}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* ── md+: sidebar + grid layout ── */}
       <div className="md:grid md:grid-cols-[180px_1fr] md:gap-x-8 lg:gap-x-10">
 
         {/* ── Sidebar ── */}
-        <aside className="hidden md:block">
-          <div className="sticky top-32">
+        <aside className="hidden md:block" aria-label="Filter navigation">
+          {/* Use CSS var so sticky top stays in sync with the combined header height */}
+          <div className="sticky" style={{ top: "var(--shell-top)" }}>
             <p className="text-[10px] tracking-[0.2em] uppercase font-sans font-bold text-chicago mb-6">
               Shop by
             </p>
 
-            <nav className="flex flex-col gap-0">
+            <nav role="tablist" aria-label="Filter by category" className="flex flex-col gap-0">
               {allItems.map((item) => {
                 const isActive = active === item.slug;
                 return (
                   <button
                     key={item.slug}
+                    role="tab"
+                    aria-selected={isActive}
                     onClick={() => select(item.slug)}
                     className={[
-                      "group flex items-center gap-3 text-left py-2.5 font-sans transition-colors duration-150 focus:outline-none",
+                      "group flex items-center gap-3 text-left py-2.5 font-sans transition-colors duration-150",
                       isActive ? "text-primary" : "text-chicago hover:text-primary",
                     ].join(" ")}
                   >
-                    {/* Active dot indicator */}
                     <span
                       className={[
                         "w-1 h-1 rounded-full shrink-0 transition-all duration-200",
@@ -115,8 +130,8 @@ export default function CategoryShell({ products, tiles }: Props) {
                           ? "bg-primary scale-100 opacity-100"
                           : "bg-transparent scale-0 opacity-0",
                       ].join(" ")}
+                      aria-hidden="true"
                     />
-
                     <span
                       className={[
                         "text-sm tracking-widest uppercase leading-none",
@@ -139,7 +154,7 @@ export default function CategoryShell({ products, tiles }: Props) {
               {heading}
             </h2>
             <span className="text-xs tracking-widest uppercase text-chicago">
-              {visible.length} items
+              {visible.length} {visible.length === 1 ? "item" : "items"}
             </span>
           </div>
 
@@ -153,17 +168,19 @@ export default function CategoryShell({ products, tiles }: Props) {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-5">
+            /* 2 cols on mobile → 3 on md → 4 on lg */
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-5">
               {visible.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
             </div>
           )}
 
-          {visible.length > 0 && (
+          {/* Clear filter — only shown when a subcategory is active */}
+          {active !== "all" && visible.length > 0 && (
             <div className="flex justify-center mt-14">
-              <button className="btn-outline">
-                {heading === "New Arrivals" ? "View All" : `View All ${heading}`}
+              <button onClick={() => select("all")} className="btn-outline">
+                View All Items
               </button>
             </div>
           )}

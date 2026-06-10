@@ -60,7 +60,7 @@ export default async function Home() {
   );
 
   return (
-    <main>
+    <main id="main-content">
       <Header />
       <Hero
         desktopSrc={hero.desktop_src}
