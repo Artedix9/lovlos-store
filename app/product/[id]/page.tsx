@@ -18,6 +18,7 @@ function toCard(p: PDPProduct): Product {
     colors: p.colors,
     sizes: p.sizes,
     isComingSoon: p.isComingSoon,
+    stock: p.stock,
   };
 }
 

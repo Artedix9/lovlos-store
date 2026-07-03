@@ -126,6 +126,76 @@ function Lightbox({
   );
 }
 
+/* ── Back-in-stock notify form (sold-out products) ── */
+function RestockNotifyForm({ productId }: { productId: string }) {
+  const [phone, setPhone] = useState("");
+  const [state, setState] = useState<"idle" | "sending" | "done" | "error">("idle");
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (phone.replace(/\D/g, "").length < 9) {
+      setState("error");
+      return;
+    }
+    setState("sending");
+    try {
+      const res = await fetch("/api/restock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId, phone }),
+      });
+      if (!res.ok) throw new Error();
+      setState("done");
+    } catch {
+      setState("error");
+    }
+  }
+
+  if (state === "done") {
+    return (
+      <div className="border border-mercury p-5 mt-3 text-center">
+        <p className="text-xs tracking-widest uppercase text-primary mb-1">You&apos;re on the list ✓</p>
+        <p className="text-xs text-chicago leading-relaxed">
+          We&apos;ll message you on WhatsApp as soon as it&apos;s back in stock.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border border-mercury p-5 mt-3">
+      <p className="text-xs tracking-widest uppercase text-primary mb-1">Want it when it&apos;s back?</p>
+      <p className="text-xs text-chicago leading-relaxed mb-3">
+        Leave your WhatsApp number and we&apos;ll message you when it&apos;s restocked.
+      </p>
+      <form onSubmit={submit} className="flex gap-2">
+        <input
+          type="tel"
+          inputMode="tel"
+          value={phone}
+          onChange={(e) => { setPhone(e.target.value); if (state === "error") setState("idle"); }}
+          placeholder="e.g. 0712 345 678"
+          aria-label="WhatsApp number"
+          required
+          className="flex-1 min-w-0 border border-mercury px-3 py-3 text-sm focus:outline-none focus:border-primary transition-colors duration-200 placeholder:text-alto"
+        />
+        <button
+          type="submit"
+          disabled={state === "sending"}
+          className="bg-primary text-white text-[11px] tracking-widest uppercase px-5 hover:bg-charcoal transition-colors duration-200 disabled:opacity-50"
+        >
+          {state === "sending" ? "..." : "Notify Me"}
+        </button>
+      </form>
+      {state === "error" && (
+        <p role="alert" className="mt-2 text-xs text-error tracking-wide">
+          Please enter a valid phone number and try again.
+        </p>
+      )}
+    </div>
+  );
+}
+
 /* ── Main interactive PDP ── */
 export default function ProductPageClient({
   product,
@@ -148,6 +218,10 @@ export default function ProductPageClient({
   const carouselRef = useRef<HTMLDivElement>(null);
 
   const heroImage = selectedColor?.image ?? product.images[0] ?? "";
+
+  /* undefined stock (e.g. bundled fallback data) means "don't gate" */
+  const soldOut = !product.isComingSoon && product.stock !== undefined && product.stock <= 0;
+  const lowStock = !product.isComingSoon && product.stock !== undefined && product.stock > 0 && product.stock <= 5;
 
   /* Log this product for the "Recently Viewed" strip */
   useEffect(() => {
@@ -351,9 +425,15 @@ export default function ProductPageClient({
                 Good vibes defined.
               </p>
 
-              <p className="font-display text-2xl font-semibold text-primary mb-6">
+              <p className={`font-display text-2xl font-semibold text-primary ${lowStock ? "mb-2" : "mb-6"}`}>
                 {formatTZS(product.price)}
               </p>
+
+              {lowStock && (
+                <p className="text-xs tracking-widest uppercase text-error mb-6">
+                  Only {product.stock} left in stock
+                </p>
+              )}
 
               {/* Color swatches */}
               {product.colors && product.colors.length > 1 && (
@@ -452,6 +532,13 @@ export default function ProductPageClient({
                   >
                     Coming Soon
                   </button>
+                ) : soldOut ? (
+                  <button
+                    disabled
+                    className="flex-1 py-4 text-xs tracking-[0.2em] uppercase bg-smoke text-chicago border border-mercury cursor-not-allowed"
+                  >
+                    Sold Out
+                  </button>
                 ) : (
                   <button
                     onClick={handleAddToBag}
@@ -476,6 +563,8 @@ export default function ProductPageClient({
                   }}
                 />
               </div>
+
+              {soldOut && <RestockNotifyForm productId={product.id} />}
 
               <p className="mt-3 text-center text-[11px] tracking-widest uppercase text-chicago">
                 Free delivery on orders above TZS 150,000

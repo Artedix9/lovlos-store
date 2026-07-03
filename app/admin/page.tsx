@@ -12,6 +12,13 @@ interface ColorEntry {
   image: string;
 }
 
+interface RestockRequest {
+  id: string;
+  product_id: string;
+  phone: string;
+  created_at: string;
+}
+
 interface FormState {
   name: string;
   category: string;
@@ -60,6 +67,13 @@ const STATUS_CLS: Record<SavedOrder["status"], string> = {
 
 function formatOrderDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+/** Normalise stored digits to international format for wa.me links. */
+function waPhone(digits: string): string {
+  if (digits.startsWith("0")) return "255" + digits.slice(1);
+  if (digits.length === 9) return "255" + digits;
+  return digits;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -476,6 +490,10 @@ export default function AdminPage() {
   const [statusSaving, setStatusSaving] = useState<string | null>(null);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
 
+  // Restock waitlist
+  const [restockRequests, setRestockRequests] = useState<RestockRequest[]>([]);
+  const [restockClearing, setRestockClearing] = useState<string | null>(null);
+
   // Hero images
   const [heroImages, setHeroImages] = useState<Record<string, { desktop_src: string; mobile_src: string }>>({});
   const [heroLoading, setHeroLoading] = useState(false);
@@ -516,6 +534,13 @@ export default function AdminPage() {
     }
   }, []);
 
+  const fetchRestock = useCallback(async (key: string) => {
+    try {
+      const res = await fetch("/api/admin/restock", { headers: { "x-admin-key": key } });
+      if (res.ok) setRestockRequests(await res.json());
+    } catch { /* silent — waitlist is non-critical */ }
+  }, []);
+
   const fetchProducts = useCallback(async (key: string): Promise<boolean> => {
     setLoading(true);
     try {
@@ -540,7 +565,8 @@ export default function AdminPage() {
     });
     fetchHeroImages(adminKey);
     fetchOrders(adminKey);
-  }, [adminKey, fetchProducts, fetchHeroImages, fetchOrders]);
+    fetchRestock(adminKey);
+  }, [adminKey, fetchProducts, fetchHeroImages, fetchOrders, fetchRestock]);
 
   // ── Login ──────────────────────────────────────────────────────────────────
 
@@ -677,6 +703,22 @@ export default function AdminPage() {
       setActionError(e instanceof Error && e.message ? `Delete failed: ${e.message}` : "Delete failed. Try again.");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  // ── Restock waitlist ───────────────────────────────────────────────────────
+
+  const handleClearRequest = async (id: string) => {
+    if (!adminKey) return;
+    setRestockClearing(id);
+    try {
+      const res = await fetch(`/api/admin/restock?id=${id}`, {
+        method: "DELETE",
+        headers: { "x-admin-key": adminKey },
+      });
+      if (res.ok) setRestockRequests((prev) => prev.filter((r) => r.id !== id));
+    } catch { /* silent — row stays, admin can retry */ } finally {
+      setRestockClearing(null);
     }
   };
 
@@ -1022,6 +1064,46 @@ export default function AdminPage() {
               </button>
             </div>
 
+            {/* Restock waitlist — customers waiting on sold-out products */}
+            {restockRequests.length > 0 && (
+              <div className="border border-amber-400/20 p-4 mb-6">
+                <p className="text-[9px] tracking-[0.3em] uppercase text-amber-400/70 mb-3">
+                  Restock Waitlist · {restockRequests.length} {restockRequests.length === 1 ? "customer" : "customers"} waiting
+                </p>
+                <div className="space-y-2">
+                  {restockRequests.map((r) => {
+                    const product = products.find((p) => p.id === r.product_id);
+                    const name = product?.name ?? r.product_id;
+                    const waText = encodeURIComponent(
+                      `Hello! Great news — the ${name} you asked about is back in stock at LOVLOS. Order it here: https://lovlos.vercel.app/product/${r.product_id}`
+                    );
+                    return (
+                      <div key={r.id} className="flex items-center gap-4 text-xs">
+                        <span className="text-white/70 flex-1 min-w-0 truncate">{name}</span>
+                        <a
+                          href={`https://wa.me/${waPhone(r.phone)}?text=${waText}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-emerald-400/70 hover:text-emerald-400 transition-colors whitespace-nowrap"
+                        >
+                          WhatsApp {r.phone}
+                        </a>
+                        <span className="text-white/25 whitespace-nowrap hidden sm:inline">{formatOrderDate(r.created_at)}</span>
+                        <button
+                          onClick={() => handleClearRequest(r.id)}
+                          disabled={restockClearing === r.id}
+                          title="Notified — remove from waitlist"
+                          className="text-[9px] tracking-[0.2em] uppercase text-white/30 hover:text-white/70 transition-colors disabled:opacity-30"
+                        >
+                          {restockClearing === r.id ? "..." : "Done"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Filter bar */}
             <div className="border border-white/[0.08] p-4 mb-6 space-y-3">
               {/* Search */}
@@ -1153,6 +1235,12 @@ export default function AdminPage() {
                               {p.stock}
                             </span>
                           )}
+                          {(() => {
+                            const waiting = restockRequests.filter((r) => r.product_id === p.id).length;
+                            return waiting > 0 ? (
+                              <p className="text-[9px] text-amber-400/50 mt-0.5">{waiting} waiting</p>
+                            ) : null;
+                          })()}
                         </td>
                         <td className="px-4 py-3">
                           {p.badge ? (

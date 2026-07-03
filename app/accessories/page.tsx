@@ -38,6 +38,7 @@ export default async function AccessoriesPage() {
       colors: p.colors,
       sizes: p.sizes,
       isComingSoon: p.isComingSoon,
+      stock: p.stock,
     }));
 
   return (

@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getSupabase, fromRow } from "@/lib/supabase";
 
-function revalidateAll() {
+function revalidateAll(productId?: string) {
   revalidatePath("/");
   revalidatePath("/men");
   revalidatePath("/women");
   revalidatePath("/accessories");
+  // Stock/price edits must show on the product page immediately, not after
+  // the hourly ISR window — e.g. restock alerts link customers straight here.
+  if (productId) revalidatePath(`/product/${productId}`);
 }
 
 function checkAuth(req: NextRequest): boolean {
@@ -70,7 +73,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await db.from("products").insert(row).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  revalidateAll();
+  revalidateAll(row.id);
   return NextResponse.json(fromRow(data), { status: 201 });
 }
 
@@ -106,7 +109,7 @@ export async function PUT(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  revalidateAll();
+  revalidateAll(body.id);
   return NextResponse.json(fromRow(data));
 }
 
@@ -118,6 +121,6 @@ export async function DELETE(req: NextRequest) {
 
   const { error } = await getSupabase().from("products").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  revalidateAll();
+  revalidateAll(id);
   return NextResponse.json({ success: true });
 }

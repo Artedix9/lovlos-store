@@ -25,6 +25,7 @@ export interface Product {
   colors?: ProductColor[];
   sizes?: string[];
   isComingSoon?: boolean;
+  stock?: number;
 }
 
 /* Tiny 1×1 smoke-colored blur placeholder so images fade in instead of popping */
@@ -45,6 +46,8 @@ export default function ProductCard({
   const [added, setAdded] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const comingSoon = product.isComingSoon ?? false;
+  /* undefined stock (e.g. bundled fallback data) means "don't gate" */
+  const soldOut = !comingSoon && product.stock !== undefined && product.stock <= 0;
 
   const [selectedColor, setSelectedColor] = useState<ProductColor | null>(
     product.colors?.[0] ?? null
@@ -76,7 +79,7 @@ export default function ProductCard({
   function handleQuickAdd(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    if (added || comingSoon) return;
+    if (added || comingSoon || soldOut) return;
     if (isOneSize) {
       quickAdd("One Size");
     } else {
@@ -131,15 +134,22 @@ export default function ProductCard({
         />
       )}
 
+      {/* Sold Out label — card stays clickable so shoppers can join the waitlist */}
+      {soldOut && !cardLabel && (
+        <span className="absolute top-3 left-3 bg-white/90 text-primary text-[9px] tracking-widest uppercase px-2 py-1 z-10 font-bold">
+          Sold Out
+        </span>
+      )}
+
       {/* Badge */}
-      {product.badge && !comingSoon && !cardLabel && (
+      {product.badge && !comingSoon && !soldOut && !cardLabel && (
         <span className="absolute top-3 left-3 bg-primary text-white text-[9px] tracking-widest uppercase px-2 py-1 z-10 font-bold">
           {product.badge}
         </span>
       )}
 
       {/* Quick Add — slides up on hover (desktop), always visible on touch */}
-      {!comingSoon && !hideQuickAdd && (
+      {!comingSoon && !soldOut && !hideQuickAdd && (
         <div
           className={[
             "absolute bottom-0 left-0 right-0 z-10",
