@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCart } from "@/context/CartContext";
+import { useWishlist } from "@/context/WishlistContext";
+import { useFocusTrap } from "@/lib/useFocusTrap";
+import { formatTZS } from "@/lib/products";
 
 /* ── Mega menu data ── */
 interface MegaColumn {
@@ -12,24 +15,25 @@ interface MegaColumn {
   links: { label: string; href: string }[];
 }
 
+/* Subcategory links use the ?type= filter that CategoryShell reads,
+   with #products so the grid is scrolled into view on landing. */
 const MEGA_MENUS: Record<string, MegaColumn[]> = {
   Women: [
     {
       heading: "Clothing",
       links: [
         { label: "Shop All Women", href: "/women" },
-        { label: "Tops & Crop Tops", href: "/women/tops" },
-        { label: "Long Sleeves", href: "/women/long-sleeves" },
-        { label: "Sports Bras", href: "/women/sports-bras" },
-        { label: "Bottoms", href: "/women/bottoms" },
-        { label: "Outerwear", href: "/women/outerwear" },
+        { label: "Tops & Crop Tops", href: "/women?type=tops#products" },
+        { label: "Sports Bras", href: "/women?type=tops#products" },
+        { label: "Bottoms", href: "/women?type=bottoms#products" },
+        { label: "Outerwear", href: "/women?type=outerwear#products" },
       ],
     },
     {
       heading: "Highlights",
       links: [
-        { label: "New Arrivals", href: "/women" },
-        { label: "Best Sellers", href: "/women" },
+        { label: "New Arrivals", href: "/women#products" },
+        { label: "Best Sellers", href: "/women#products" },
         { label: "Lookbook", href: "/about" },
       ],
     },
@@ -42,8 +46,8 @@ const MEGA_MENUS: Record<string, MegaColumn[]> = {
     {
       heading: "Accessories",
       links: [
-        { label: "Bags & Totes", href: "/accessories/bags" },
-        { label: "Hats & Caps", href: "/accessories/hats" },
+        { label: "Bags & Totes", href: "/accessories?type=bags#products" },
+        { label: "Hats & Caps", href: "/accessories?type=hats#products" },
         { label: "Shop All", href: "/accessories" },
       ],
     },
@@ -53,18 +57,17 @@ const MEGA_MENUS: Record<string, MegaColumn[]> = {
       heading: "Clothing",
       links: [
         { label: "Shop All Men", href: "/men" },
-        { label: "Tees & Tops", href: "/men/tops" },
-        { label: "Hoodies & Sweatshirts", href: "/men/tops" },
-        { label: "Pants & Joggers", href: "/men/bottoms" },
-        { label: "Shorts", href: "/men/bottoms" },
-        { label: "Outerwear", href: "/men/outerwear" },
+        { label: "Tees & Tops", href: "/men?type=tops#products" },
+        { label: "Hoodies & Sweatshirts", href: "/men?type=tops#products" },
+        { label: "Pants & Shorts", href: "/men?type=bottoms#products" },
+        { label: "Outerwear", href: "/men?type=outerwear#products" },
       ],
     },
     {
       heading: "Highlights",
       links: [
-        { label: "New Arrivals", href: "/men" },
-        { label: "Best Sellers", href: "/men" },
+        { label: "New Arrivals", href: "/men#products" },
+        { label: "Best Sellers", href: "/men#products" },
         { label: "Lookbook", href: "/about" },
       ],
     },
@@ -77,9 +80,9 @@ const MEGA_MENUS: Record<string, MegaColumn[]> = {
     {
       heading: "Accessories",
       links: [
-        { label: "Bags & Totes", href: "/accessories/bags" },
-        { label: "Hats & Caps", href: "/accessories/hats" },
-        { label: "Lifestyle", href: "/accessories/lifestyle" },
+        { label: "Bags & Totes", href: "/accessories?type=bags#products" },
+        { label: "Hats & Caps", href: "/accessories?type=hats#products" },
+        { label: "Lifestyle", href: "/accessories?type=lifestyle#products" },
         { label: "Shop All", href: "/accessories" },
       ],
     },
@@ -89,25 +92,25 @@ const MEGA_MENUS: Record<string, MegaColumn[]> = {
       heading: "Bags",
       links: [
         { label: "Shop All Accessories", href: "/accessories" },
-        { label: "Canvas Tote Bags", href: "/accessories/bags" },
-        { label: "Crossbody Bags", href: "/accessories/bags" },
-        { label: "Backpacks", href: "/accessories/bags" },
+        { label: "Canvas Tote Bags", href: "/accessories?type=bags#products" },
+        { label: "Crossbody Bags", href: "/accessories?type=bags#products" },
+        { label: "Backpacks", href: "/accessories?type=bags#products" },
       ],
     },
     {
       heading: "Hats & Caps",
       links: [
-        { label: "Structured Caps", href: "/accessories/hats" },
-        { label: "Beanies", href: "/accessories/hats" },
-        { label: "Bucket Hats", href: "/accessories/hats" },
+        { label: "Structured Caps", href: "/accessories?type=hats#products" },
+        { label: "Beanies", href: "/accessories?type=hats#products" },
+        { label: "Bucket Hats", href: "/accessories?type=hats#products" },
       ],
     },
     {
       heading: "Lifestyle",
       links: [
-        { label: "Socks", href: "/accessories/lifestyle" },
-        { label: "Belts", href: "/accessories/lifestyle" },
-        { label: "Watches", href: "/accessories/lifestyle" },
+        { label: "Socks", href: "/accessories?type=lifestyle#products" },
+        { label: "Belts", href: "/accessories?type=lifestyle#products" },
+        { label: "Watches", href: "/accessories?type=lifestyle#products" },
       ],
     },
   ],
@@ -128,13 +131,23 @@ const MOBILE_NAV = [
   { label: "Women", href: "/women" },
   { label: "Men", href: "/men" },
   { label: "Accessories", href: "/accessories" },
+  { label: "Wishlist", href: "/wishlist" },
   { label: "About", href: "/about" },
 ];
 
 const TRANSITION_MS = 300;
 
+/* ── Search index entry served by /api/products ── */
+interface SearchEntry {
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+  image: string | null;
+}
+
 /* ── Mega menu panel ── */
-function MegaMenu({ columns }: { columns: MegaColumn[] }) {
+function MegaMenu({ columns, onNavigate }: { columns: MegaColumn[]; onNavigate: () => void }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: -8 }}
@@ -154,6 +167,7 @@ function MegaMenu({ columns }: { columns: MegaColumn[] }) {
                 <li key={link.label}>
                   <Link
                     href={link.href}
+                    onClick={onNavigate}
                     className="text-sm text-mine tracking-wide hover:text-primary transition-colors duration-150 font-light"
                   >
                     {link.label}
@@ -171,13 +185,19 @@ function MegaMenu({ columns }: { columns: MegaColumn[] }) {
 export default function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchIndex, setSearchIndex] = useState<SearchEntry[] | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuMounted, setMenuMounted] = useState(false);
   const [badgePop, setBadgePop] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const headerRef = useRef<HTMLElement>(null);
+  const searchButtonRef = useRef<HTMLButtonElement>(null);
+  const triggerRefs = useRef<Record<string, HTMLAnchorElement | null>>({});
+  const menuRef = useFocusTrap<HTMLElement>(menuOpen, () => setMenuOpen(false));
 
   const { openCart, totalItems } = useCart();
+  const { count: wishlistCount } = useWishlist();
   const prevTotalRef = useRef(totalItems);
 
   /* Badge pop animation */
@@ -230,6 +250,60 @@ export default function Header() {
     };
   }, []);
 
+  /* Keyboard support for the mega menu: close when focus leaves the header,
+     close on Escape and return focus to the trigger link. */
+  useEffect(() => {
+    if (!activeMenu) return;
+
+    function onFocusIn(e: FocusEvent) {
+      if (headerRef.current && !headerRef.current.contains(e.target as Node)) {
+        setActiveMenu(null);
+      }
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        const trigger = activeMenu ? triggerRefs.current[activeMenu] : null;
+        setActiveMenu(null);
+        trigger?.focus();
+      }
+    }
+
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [activeMenu]);
+
+  /* Lazily fetch the product index the first time search opens */
+  useEffect(() => {
+    if (!searchOpen || searchIndex !== null) return;
+    let cancelled = false;
+    fetch("/api/products")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: SearchEntry[]) => { if (!cancelled) setSearchIndex(data); })
+      .catch(() => { if (!cancelled) setSearchIndex([]); });
+    return () => { cancelled = true; };
+  }, [searchOpen, searchIndex]);
+
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false);
+    setSearchQuery("");
+    searchButtonRef.current?.focus();
+  }, []);
+
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q || !searchIndex) return [];
+    return searchIndex
+      .filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)
+      )
+      .slice(0, 6);
+  }, [searchQuery, searchIndex]);
+
   return (
     <>
       {/* Announcement Bar */}
@@ -240,7 +314,7 @@ export default function Header() {
       </div>
 
       {/* Main Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-mercury">
+      <header ref={headerRef} className="sticky top-0 z-50 bg-white border-b border-mercury">
         <div className="grid grid-cols-3 items-center h-14 md:h-16 px-4 md:px-10 lg:px-16">
 
           {/* Col 1 — Hamburger (mobile) | Left nav (desktop) */}
@@ -250,7 +324,7 @@ export default function Header() {
               aria-label={menuOpen ? "Close menu" : "Open menu"}
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen((v) => !v)}
-              className="md:hidden text-primary hover:text-chicago transition-colors duration-200 p-1 -ml-1"
+              className="md:hidden text-primary hover:text-chicago transition-colors duration-200 p-2 -ml-2"
             >
               {menuOpen ? <IconX /> : <IconMenu />}
             </button>
@@ -268,6 +342,9 @@ export default function Header() {
                   >
                     <Link
                       href={item.href}
+                      ref={(el) => { triggerRefs.current[item.label] = el; }}
+                      onFocus={() => hasMega && openMega(item.label)}
+                      aria-expanded={hasMega ? activeMenu === item.label : undefined}
                       className={[
                         "nav-link transition-colors duration-200",
                         activeMenu === item.label ? "text-primary" : "",
@@ -296,7 +373,7 @@ export default function Header() {
           </div>
 
           {/* Col 3 — Right nav + icons */}
-          <div className="flex items-center justify-end gap-4 md:gap-7">
+          <div className="flex items-center justify-end gap-2 md:gap-7">
             <nav className="hidden md:flex items-center gap-7" aria-label="Primary right navigation">
               {NAV_RIGHT.map((item) => (
                 <Link key={item.label} href={item.href} className="nav-link">
@@ -305,29 +382,49 @@ export default function Header() {
               ))}
             </nav>
 
-            {/* Search */}
+            {/* Search — available on all viewports */}
             <button
+              ref={searchButtonRef}
               aria-label="Search"
-              onClick={() => setSearchOpen((v) => !v)}
-              className="hidden md:block text-primary hover:text-chicago transition-colors duration-200"
+              aria-expanded={searchOpen}
+              onClick={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
+              className="text-primary hover:text-chicago transition-colors duration-200 p-2"
             >
               <IconSearch />
             </button>
 
+            {/* Wishlist */}
+            <Link
+              href="/wishlist"
+              aria-label={`Wishlist${wishlistCount > 0 ? `, ${wishlistCount} ${wishlistCount === 1 ? "item" : "items"}` : ""}`}
+              className="relative text-primary hover:text-chicago transition-colors duration-200 p-2 hidden sm:block"
+            >
+              <IconHeart />
+              {wishlistCount > 0 && (
+                <span
+                  className="absolute top-0 right-0 bg-primary text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center leading-none"
+                  aria-hidden="true"
+                >
+                  {wishlistCount > 9 ? "9+" : wishlistCount}
+                </span>
+              )}
+            </Link>
+
             {/* Cart */}
             <button
-              aria-label="Open shopping bag"
+              aria-label={`Open shopping bag${totalItems > 0 ? `, ${totalItems} ${totalItems === 1 ? "item" : "items"}` : ""}`}
               onClick={openCart}
-              className="relative text-primary hover:text-chicago transition-colors duration-200 p-1 -mr-1"
+              className="relative text-primary hover:text-chicago transition-colors duration-200 p-2 -mr-2"
             >
               <IconBag />
               {totalItems > 0 && (
                 <span
                   className={[
-                    "absolute -top-1 -right-1 bg-primary text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center leading-none transition-transform",
+                    "absolute top-0 right-0 bg-primary text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center leading-none transition-transform",
                     badgePop ? "scale-125" : "scale-100",
                   ].join(" ")}
                   style={{ transitionDuration: "200ms" }}
+                  aria-hidden="true"
                 >
                   {totalItems > 9 ? "9+" : totalItems}
                 </span>
@@ -336,27 +433,79 @@ export default function Header() {
           </div>
         </div>
 
-        {/* Search drawer */}
+        {/* Search drawer — all viewports, Escape closes */}
         {searchOpen && (
-          <div className="hidden md:block border-t border-mercury bg-white">
-            <div className="max-w-xl mx-auto px-6 py-4">
+          <div
+            className="border-t border-mercury bg-white"
+            onKeyDown={(e) => { if (e.key === "Escape") closeSearch(); }}
+          >
+            <div className="max-w-xl mx-auto px-4 md:px-6 py-4">
               <div className="flex items-center gap-3 border-b border-primary pb-2">
-                <IconSearch className="text-dawn shrink-0" />
+                <IconSearch className="text-chicago shrink-0" />
                 <input
                   autoFocus
                   type="search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search LOVLOS..."
-                  className="w-full text-sm text-primary placeholder:text-dawn bg-transparent outline-none tracking-wide"
+                  aria-label="Search products"
+                  className="w-full text-sm text-primary placeholder:text-chicago bg-transparent outline-none tracking-wide"
                 />
                 <button
-                  onClick={() => setSearchOpen(false)}
-                  className="text-xs tracking-widest uppercase text-chicago hover:text-primary transition-colors duration-200 shrink-0"
+                  onClick={closeSearch}
+                  className="text-xs tracking-widest uppercase text-chicago hover:text-primary transition-colors duration-200 shrink-0 p-1"
                 >
                   Close
                 </button>
               </div>
+
+              {/* Live results */}
+              {searchQuery.trim() && (
+                <div aria-live="polite">
+                  {searchResults.length > 0 ? (
+                    <ul className="py-3 divide-y divide-smoke">
+                      {searchResults.map((p) => (
+                        <li key={p.id}>
+                          <Link
+                            href={`/product/${p.id}`}
+                            onClick={closeSearch}
+                            className="flex items-center gap-4 py-2.5 group"
+                          >
+                            <div className="relative w-10 h-12 shrink-0 bg-smoke overflow-hidden">
+                              {p.image && (
+                                <Image
+                                  src={p.image}
+                                  alt=""
+                                  fill
+                                  sizes="40px"
+                                  className="object-cover object-top"
+                                />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-primary group-hover:text-chicago transition-colors duration-150 truncate tracking-wide">
+                                {p.name}
+                              </p>
+                              <p className="text-[10px] tracking-widest uppercase text-chicago">
+                                {p.category}
+                              </p>
+                            </div>
+                            <p className="text-xs text-chicago tracking-wide shrink-0">
+                              {formatTZS(p.price)}
+                            </p>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="py-5 text-sm text-chicago tracking-wide text-center">
+                      {searchIndex === null
+                        ? "Searching…"
+                        : `No results for “${searchQuery.trim()}”.`}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -369,13 +518,18 @@ export default function Header() {
         >
           <AnimatePresence>
             {activeMenu && MEGA_MENUS[activeMenu] && (
-              <MegaMenu key={activeMenu} columns={MEGA_MENUS[activeMenu]} />
+              <MegaMenu
+                key={activeMenu}
+                columns={MEGA_MENUS[activeMenu]}
+                onNavigate={() => setActiveMenu(null)}
+              />
             )}
           </AnimatePresence>
         </div>
       </header>
 
-      {/* Page backdrop when mega menu is open — desktop only */}
+      {/* Page backdrop when mega menu is open — desktop only.
+          Sits below the z-50 header, so the header stays interactive. */}
       <AnimatePresence>
         {activeMenu && (
           <motion.div
@@ -385,7 +539,6 @@ export default function Header() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="hidden md:block fixed inset-0 z-30 bg-black/25"
-            style={{ top: "calc(var(--header-height, 0px))" }}
             onClick={() => setActiveMenu(null)}
             aria-hidden="true"
           />
@@ -406,11 +559,14 @@ export default function Header() {
           />
 
           <nav
+            ref={menuRef}
+            role="dialog"
+            aria-modal="true"
             aria-label="Mobile navigation"
             style={{ transitionDuration: `${TRANSITION_MS}ms` }}
             className={[
               "fixed left-0 top-0 h-full w-[80vw] max-w-[320px] z-[85]",
-              "bg-zinc-950 flex flex-col",
+              "bg-primary flex flex-col",
               "transition-transform ease-in-out md:hidden",
               menuOpen ? "translate-x-0" : "-translate-x-full",
             ].join(" ")}
@@ -428,7 +584,7 @@ export default function Header() {
               <button
                 onClick={closeMenu}
                 aria-label="Close menu"
-                className="text-zinc-400 hover:text-zinc-100 transition-colors duration-200"
+                className="text-white/60 hover:text-white transition-colors duration-200 p-2 -mr-2"
               >
                 <IconX />
               </button>
@@ -440,17 +596,17 @@ export default function Header() {
                   <Link
                     href={item.href}
                     onClick={closeMenu}
-                    className="flex items-center justify-between px-6 py-4 text-sm font-bold uppercase tracking-widest text-zinc-100 hover:text-white hover:bg-white/5 transition-colors duration-150 border-b border-white/[0.06]"
+                    className="flex items-center justify-between px-6 py-4 text-sm font-bold uppercase tracking-widest text-white hover:bg-white/5 transition-colors duration-150 border-b border-white/[0.06]"
                   >
                     {item.label}
-                    <span className="text-zinc-600" aria-hidden="true">→</span>
+                    <span className="text-white/40" aria-hidden="true">→</span>
                   </Link>
                 </li>
               ))}
             </ul>
 
             <div className="px-6 py-5 border-t border-white/[0.08]">
-              <p className="text-[10px] tracking-ultra uppercase text-zinc-600">
+              <p className="text-[10px] tracking-ultra uppercase text-white/50">
                 Good vibes defined.
               </p>
             </div>
@@ -470,6 +626,16 @@ function IconSearch({ className = "" }: { className?: string }) {
       strokeLinejoin="round" className={className} aria-hidden="true">
       <circle cx="11" cy="11" r="8" />
       <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
+function IconHeart({ className = "" }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+      strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
     </svg>
   );
 }
