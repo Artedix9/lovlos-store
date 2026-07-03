@@ -32,6 +32,7 @@ export default async function MenPage() {
       id: p.id,
       name: p.name,
       price: p.price,
+      salePrice: p.salePrice,
       href: `/product/${p.id}`,
       badge: p.badge,
       image: p.colors?.[0]?.image ?? p.images[0],

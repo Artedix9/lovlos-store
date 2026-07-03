@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/context/ToastContext";
-import { formatTZS } from "@/lib/products";
+import { formatTZS, effectivePrice } from "@/lib/products";
 import WishlistButton from "@/components/WishlistButton";
 
 export interface ProductColor {
@@ -18,6 +18,7 @@ export interface Product {
   id: string;
   name: string;
   price: number;
+  salePrice?: number;
   href: string;
   badge?: string;
   image?: string;
@@ -48,6 +49,8 @@ export default function ProductCard({
   const comingSoon = product.isComingSoon ?? false;
   /* undefined stock (e.g. bundled fallback data) means "don't gate" */
   const soldOut = !comingSoon && product.stock !== undefined && product.stock <= 0;
+  const price = effectivePrice(product);
+  const onSale = price < product.price;
 
   const [selectedColor, setSelectedColor] = useState<ProductColor | null>(
     product.colors?.[0] ?? null
@@ -65,7 +68,7 @@ export default function ProductCard({
       name: product.name,
       size,
       color: selectedColor?.name,
-      price: product.price,
+      price,
       image: imageSrc ?? "",
     });
     showToast(
@@ -128,7 +131,7 @@ export default function ProductCard({
           item={{
             id: product.id,
             name: product.name,
-            price: product.price,
+            price,
             image: imageSrc ?? "",
           }}
         />
@@ -141,10 +144,15 @@ export default function ProductCard({
         </span>
       )}
 
-      {/* Badge */}
+      {/* Badge — an explicit badge wins; otherwise sale products get a Sale tag */}
       {product.badge && !comingSoon && !soldOut && !cardLabel && (
         <span className="absolute top-3 left-3 bg-primary text-white text-[9px] tracking-widest uppercase px-2 py-1 z-10 font-bold">
           {product.badge}
+        </span>
+      )}
+      {!product.badge && onSale && !comingSoon && !soldOut && !cardLabel && (
+        <span className="absolute top-3 left-3 bg-error text-white text-[9px] tracking-widest uppercase px-2 py-1 z-10 font-bold">
+          Sale
         </span>
       )}
 
@@ -247,9 +255,16 @@ export default function ProductCard({
               {product.name}
             </Link>
           )}
-          <p className="text-sm text-chicago tracking-wide">
-            {comingSoon ? "—" : formatTZS(product.price)}
-          </p>
+          {comingSoon ? (
+            <p className="text-sm text-chicago tracking-wide">—</p>
+          ) : onSale ? (
+            <p className="text-sm tracking-wide">
+              <span className="text-error">{formatTZS(price)}</span>
+              <span className="text-chicago line-through ml-2">{formatTZS(product.price)}</span>
+            </p>
+          ) : (
+            <p className="text-sm text-chicago tracking-wide">{formatTZS(product.price)}</p>
+          )}
 
           {/* Color swatches */}
           {!comingSoon && product.colors && product.colors.length > 1 && (

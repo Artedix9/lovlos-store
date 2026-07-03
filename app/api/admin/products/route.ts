@@ -18,6 +18,14 @@ function checkAuth(req: NextRequest): boolean {
   return req.headers.get("x-admin-key") === secret;
 }
 
+/** null = no sale; otherwise must be a positive amount below the regular price. */
+function parseSalePrice(raw: unknown, regularPrice: number): number | null | undefined {
+  if (raw === undefined || raw === null || raw === "") return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0 || n >= regularPrice) return undefined; // invalid
+  return Math.round(n);
+}
+
 function generateId(name: string): string {
   const base = name
     .toLowerCase()
@@ -44,6 +52,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "name, category, and price are required" }, { status: 400 });
   }
 
+  const salePrice = parseSalePrice(body.salePrice, Number(body.price));
+  if (salePrice === undefined) {
+    return NextResponse.json({ error: "Sale price must be lower than the regular price" }, { status: 400 });
+  }
+
   const db = getSupabase();
 
   const { data: maxData } = await db
@@ -59,6 +72,7 @@ export async function POST(req: NextRequest) {
     category: body.category,
     category_href: `/${(body.category as string).toLowerCase()}`,
     price: Number(body.price),
+    sale_price: salePrice,
     badge: body.badge || null,
     images: body.images ?? [],
     colors: body.colors ?? [],
@@ -91,6 +105,13 @@ export async function PUT(req: NextRequest) {
     updates.category_href = `/${(body.category as string).toLowerCase()}`;
   }
   if (body.price !== undefined) updates.price = Number(body.price);
+  if ("salePrice" in body && body.price !== undefined) {
+    const salePrice = parseSalePrice(body.salePrice, Number(body.price));
+    if (salePrice === undefined) {
+      return NextResponse.json({ error: "Sale price must be lower than the regular price" }, { status: 400 });
+    }
+    updates.sale_price = salePrice;
+  }
   if ("badge" in body) updates.badge = body.badge || null;
   if (body.images !== undefined) updates.images = body.images;
   if (body.colors !== undefined) updates.colors = body.colors;

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getProducts } from "@/lib/data";
+import { effectivePrice } from "@/lib/products";
 
 export const revalidate = 3600;
 
@@ -12,7 +13,7 @@ export async function GET() {
       id: p.id,
       name: p.name,
       category: p.category,
-      price: p.price,
+      price: effectivePrice(p),
       image: p.colors?.[0]?.image ?? p.images[0] ?? null,
     }));
 

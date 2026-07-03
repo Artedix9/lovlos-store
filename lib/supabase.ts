@@ -21,6 +21,7 @@ export function fromRow(row: any): PDPProduct {
     category: row.category,
     categoryHref: row.category_href,
     price: row.price,
+    salePrice: row.sale_price ?? undefined,
     badge: row.badge ?? undefined,
     images: row.images ?? [],
     colors: row.colors ?? [],

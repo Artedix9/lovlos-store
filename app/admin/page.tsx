@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState, useEffect, useCallback, useRef } from "react";
-import type { PDPProduct } from "@/lib/products";
+import { effectivePrice, type PDPProduct } from "@/lib/products";
 import type { SavedOrder } from "@/lib/orders";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -19,10 +19,22 @@ interface RestockRequest {
   created_at: string;
 }
 
+interface AdminReview {
+  id: string;
+  product_id: string;
+  author: string;
+  rating: number;
+  body: string;
+  photo_url: string | null;
+  approved: boolean;
+  created_at: string;
+}
+
 interface FormState {
   name: string;
   category: string;
   price: string;
+  salePrice: string;
   stock: string;
   badge: string;
   images: string[];
@@ -38,6 +50,7 @@ const DEFAULT_FORM: FormState = {
   name: "",
   category: "Women",
   price: "",
+  salePrice: "",
   stock: "",
   badge: "",
   images: [],
@@ -469,7 +482,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
 
   // UI
-  const [activeTab, setActiveTab] = useState<"overview" | "orders" | "inventory" | "hero">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "orders" | "inventory" | "reviews" | "hero">("overview");
   const [showModal, setShowModal] = useState(false);
 
   // Inventory filters
@@ -493,6 +506,18 @@ export default function AdminPage() {
   // Restock waitlist
   const [restockRequests, setRestockRequests] = useState<RestockRequest[]>([]);
   const [restockClearing, setRestockClearing] = useState<string | null>(null);
+
+  // Reviews
+  const [reviews, setReviews] = useState<AdminReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState("");
+  const [reviewActing, setReviewActing] = useState<string | null>(null);
+
+  // Announcement bar
+  const [announcement, setAnnouncement] = useState("");
+  const [announcementSaving, setAnnouncementSaving] = useState(false);
+  const [announcementSaved, setAnnouncementSaved] = useState(false);
+  const [announcementError, setAnnouncementError] = useState("");
 
   // Hero images
   const [heroImages, setHeroImages] = useState<Record<string, { desktop_src: string; mobile_src: string }>>({});
@@ -541,6 +566,33 @@ export default function AdminPage() {
     } catch { /* silent — waitlist is non-critical */ }
   }, []);
 
+  const fetchReviews = useCallback(async (key: string) => {
+    setReviewsLoading(true);
+    setReviewsError("");
+    try {
+      const res = await fetch("/api/admin/reviews", { headers: { "x-admin-key": key } });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error ?? "");
+      }
+      setReviews(await res.json());
+    } catch (e) {
+      setReviewsError(e instanceof Error && e.message ? `Failed to load reviews: ${e.message}` : "Failed to load reviews.");
+    } finally {
+      setReviewsLoading(false);
+    }
+  }, []);
+
+  const fetchSettings = useCallback(async (key: string) => {
+    try {
+      const res = await fetch("/api/admin/settings", { headers: { "x-admin-key": key } });
+      if (res.ok) {
+        const json = await res.json();
+        setAnnouncement(json.announcement ?? "");
+      }
+    } catch { /* silent — editor starts blank */ }
+  }, []);
+
   const fetchProducts = useCallback(async (key: string): Promise<boolean> => {
     setLoading(true);
     try {
@@ -566,7 +618,9 @@ export default function AdminPage() {
     fetchHeroImages(adminKey);
     fetchOrders(adminKey);
     fetchRestock(adminKey);
-  }, [adminKey, fetchProducts, fetchHeroImages, fetchOrders, fetchRestock]);
+    fetchReviews(adminKey);
+    fetchSettings(adminKey);
+  }, [adminKey, fetchProducts, fetchHeroImages, fetchOrders, fetchRestock, fetchReviews, fetchSettings]);
 
   // ── Login ──────────────────────────────────────────────────────────────────
 
@@ -612,6 +666,7 @@ export default function AdminPage() {
       name: p.name,
       category: p.category,
       price: String(p.price),
+      salePrice: p.salePrice != null ? String(p.salePrice) : "",
       stock: String(p.stock ?? 0),
       badge: p.badge ?? "",
       images: p.images ?? [],
@@ -646,6 +701,7 @@ export default function AdminPage() {
       name: form.name,
       category: form.category,
       price: Number(form.price),
+      salePrice: form.salePrice.trim() === "" ? null : Number(form.salePrice),
       stock: Number(form.stock) || 0,
       badge: form.badge || undefined,
       images: form.images,
@@ -722,6 +778,78 @@ export default function AdminPage() {
     }
   };
 
+  // ── Review moderation ──────────────────────────────────────────────────────
+
+  const handleReviewApprove = async (id: string, approved: boolean) => {
+    if (!adminKey) return;
+    setReviewActing(id);
+    setReviewsError("");
+    try {
+      const res = await fetch("/api/admin/reviews", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify({ id, approved }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error ?? "");
+      }
+      setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, approved } : r)));
+    } catch (e) {
+      setReviewsError(e instanceof Error && e.message ? `Failed to update review: ${e.message}` : "Failed to update review.");
+    } finally {
+      setReviewActing(null);
+    }
+  };
+
+  const handleReviewDelete = async (id: string) => {
+    if (!adminKey) return;
+    if (!window.confirm("Delete this review? This cannot be undone.")) return;
+    setReviewActing(id);
+    setReviewsError("");
+    try {
+      const res = await fetch(`/api/admin/reviews?id=${id}`, {
+        method: "DELETE",
+        headers: { "x-admin-key": adminKey },
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error ?? "");
+      }
+      setReviews((prev) => prev.filter((r) => r.id !== id));
+    } catch (e) {
+      setReviewsError(e instanceof Error && e.message ? `Failed to delete review: ${e.message}` : "Failed to delete review.");
+    } finally {
+      setReviewActing(null);
+    }
+  };
+
+  // ── Announcement bar save ──────────────────────────────────────────────────
+
+  const handleSaveAnnouncement = async () => {
+    if (!adminKey) return;
+    setAnnouncementSaving(true);
+    setAnnouncementError("");
+    setAnnouncementSaved(false);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify({ key: "announcement", value: announcement.trim() }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error ?? "");
+      }
+      setAnnouncementSaved(true);
+      setTimeout(() => setAnnouncementSaved(false), 2500);
+    } catch (e) {
+      setAnnouncementError(e instanceof Error && e.message ? `Failed to save: ${e.message}` : "Failed to save. Try again.");
+    } finally {
+      setAnnouncementSaving(false);
+    }
+  };
+
   // ── Order status update ────────────────────────────────────────────────────
 
   const handleStatusChange = async (id: string, status: SavedOrder["status"]) => {
@@ -788,10 +916,11 @@ export default function AdminPage() {
   const women = products.filter((p) => p.category === "Women").length;
   const accessories = products.filter((p) => p.category === "Accessories").length;
   const unitsInStock = products.reduce((sum, p) => sum + (p.stock ?? 0), 0);
-  const stockValue = products.reduce((sum, p) => sum + (p.stock ?? 0) * p.price, 0);
+  const stockValue = products.reduce((sum, p) => sum + (p.stock ?? 0) * effectivePrice(p), 0);
   const outOfStock = products.filter((p) => !p.isComingSoon && (p.stock ?? 0) === 0).length;
   const lowStock = products.filter((p) => !p.isComingSoon && (p.stock ?? 0) > 0 && (p.stock ?? 0) <= 5).length;
 
+  const pendingReviews = reviews.filter((r) => !r.approved).length;
   const pendingOrders = orders.filter((o) => o.status === "pending").length;
   const deliveredOrders = orders.filter((o) => o.status === "delivered").length;
   const paidOrders = orders.filter((o) => PAID_STATUSES.has(o.status));
@@ -853,7 +982,7 @@ export default function AdminPage() {
 
       <main className="px-6 md:px-10 py-8 max-w-7xl mx-auto">
         <nav className="flex gap-8 border-b border-white/[0.08] mb-10">
-          {(["overview", "orders", "inventory", "hero"] as const).map((tab) => (
+          {(["overview", "orders", "inventory", "reviews", "hero"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -861,9 +990,12 @@ export default function AdminPage() {
                 activeTab === tab ? "text-white border-b border-white -mb-px" : "text-white/25 hover:text-white/50"
               }`}
             >
-              {tab === "hero" ? "Hero Images" : tab}
+              {tab === "hero" ? "Site & Banners" : tab}
               {tab === "orders" && pendingOrders > 0 && (
                 <span className="ml-1.5 text-[8px] text-amber-400/80 tabular-nums">{pendingOrders}</span>
+              )}
+              {tab === "reviews" && pendingReviews > 0 && (
+                <span className="ml-1.5 text-[8px] text-amber-400/80 tabular-nums">{pendingReviews}</span>
               )}
             </button>
           ))}
@@ -1226,7 +1358,16 @@ export default function AdminPage() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-xs text-white/50">{p.category}</td>
-                        <td className="px-4 py-3 text-xs text-white/50 tabular-nums">{p.price.toLocaleString("en-TZ")}</td>
+                        <td className="px-4 py-3 text-xs tabular-nums">
+                          {p.salePrice != null ? (
+                            <>
+                              <span className="text-red-400/80">{p.salePrice.toLocaleString("en-TZ")}</span>
+                              <span className="text-white/25 line-through ml-2">{p.price.toLocaleString("en-TZ")}</span>
+                            </>
+                          ) : (
+                            <span className="text-white/50">{p.price.toLocaleString("en-TZ")}</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3">
                           {(p.stock ?? 0) === 0 ? (
                             <span className="text-[9px] tracking-wider uppercase text-red-400/70">Out</span>
@@ -1283,9 +1424,106 @@ export default function AdminPage() {
             )}
           </section>
         )}
-        {/* ── Hero Images ───────────────────────────────────────────────────── */}
+        {/* ── Reviews ───────────────────────────────────────────────────────── */}
+        {activeTab === "reviews" && (
+          <section>
+            <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-2">
+              Customer Reviews
+              {pendingReviews > 0 && <span className="text-amber-400/60 ml-2 normal-case tracking-normal">· {pendingReviews} awaiting approval</span>}
+            </p>
+            <p className="text-[9px] text-white/20 mb-8">Reviews only appear on the product page after you approve them.</p>
+
+            {reviewsError && <p className="text-red-400/80 text-[10px] tracking-wider mb-4">{reviewsError}</p>}
+
+            {reviewsLoading ? (
+              <div className="border border-white/[0.08] py-24 text-center text-[9px] tracking-[0.3em] uppercase text-white/20">Loading...</div>
+            ) : reviews.length === 0 ? (
+              <div className="border border-white/[0.08] py-24 text-center text-[9px] tracking-[0.3em] uppercase text-white/15">No reviews yet</div>
+            ) : (
+              <div className="space-y-3">
+                {reviews.map((r) => {
+                  const product = products.find((p) => p.id === r.product_id);
+                  return (
+                    <div key={r.id} className={`border p-5 ${r.approved ? "border-white/[0.08]" : "border-amber-400/25"}`}>
+                      <div className="flex items-start justify-between gap-4 mb-2">
+                        <div>
+                          <p className="text-xs text-white/80">
+                            {r.author}
+                            <span className="text-white/25 ml-2">on {product?.name ?? r.product_id}</span>
+                          </p>
+                          <p className="text-amber-400/80 text-xs tracking-[0.2em] mt-1" aria-label={`${r.rating} out of 5 stars`}>
+                            {"★".repeat(r.rating)}<span className="text-white/15">{"★".repeat(5 - r.rating)}</span>
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className={`text-[9px] tracking-wider uppercase ${r.approved ? "text-emerald-400/60" : "text-amber-400/70"}`}>
+                            {r.approved ? "Live" : "Pending"}
+                          </span>
+                          <span className="text-[9px] text-white/20 hidden sm:inline">{formatOrderDate(r.created_at)}</span>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-white/50 leading-relaxed mb-3">{r.body}</p>
+
+                      {r.photo_url && (
+                        <a href={r.photo_url} target="_blank" rel="noopener noreferrer" className="inline-block mb-3">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={r.photo_url} alt="Review photo" className="w-16 h-16 object-cover border border-white/15" />
+                        </a>
+                      )}
+
+                      <div className="flex gap-4">
+                        <button
+                          onClick={() => handleReviewApprove(r.id, !r.approved)}
+                          disabled={reviewActing === r.id}
+                          className={`text-[9px] tracking-[0.2em] uppercase transition-colors disabled:opacity-30 ${
+                            r.approved ? "text-white/30 hover:text-white/60" : "text-emerald-400/70 hover:text-emerald-400"
+                          }`}
+                        >
+                          {reviewActing === r.id ? "..." : r.approved ? "Unpublish" : "Approve"}
+                        </button>
+                        <button
+                          onClick={() => handleReviewDelete(r.id)}
+                          disabled={reviewActing === r.id}
+                          className="text-[9px] tracking-[0.2em] uppercase text-red-400/50 hover:text-red-400 transition-colors disabled:opacity-30"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* ── Site & Banners ────────────────────────────────────────────────── */}
         {activeTab === "hero" && (
           <section>
+            <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-2">Announcement Bar</p>
+            <p className="text-[9px] text-white/20 mb-4">Shown at the very top of every page. Leave empty to hide the bar.</p>
+            <div className="border border-white/10 p-5 mb-10">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  type="text"
+                  value={announcement}
+                  onChange={(e) => setAnnouncement(e.target.value)}
+                  maxLength={120}
+                  placeholder="e.g. Free delivery on orders above TZS 150,000"
+                  className="flex-1 bg-transparent border border-white/20 text-white px-3 py-2.5 text-sm focus:outline-none focus:border-white/60 transition-colors placeholder:text-white/20"
+                />
+                <button
+                  onClick={handleSaveAnnouncement}
+                  disabled={announcementSaving}
+                  className="bg-white text-black text-[9px] tracking-[0.3em] uppercase px-6 py-2.5 font-bold hover:bg-white/90 transition-colors disabled:opacity-40 shrink-0"
+                >
+                  {announcementSaving ? "Saving..." : announcementSaved ? "Saved ✓" : "Save"}
+                </button>
+              </div>
+              {announcementError && <p className="text-red-400/80 text-[10px] tracking-wider mt-2">{announcementError}</p>}
+            </div>
+
             <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-2">Hero Banners</p>
             <p className="text-[9px] text-white/20 mb-8">Upload new images to replace the hero banner on each page. Changes go live immediately.</p>
 
@@ -1351,8 +1589,8 @@ export default function AdminPage() {
                 <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. High-Waist Legging" required className={inputCls} />
               </Field>
 
-              {/* Category + Price */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Category + Price + Sale Price */}
+              <div className="grid grid-cols-3 gap-3">
                 <Field label="Category" required>
                   <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={selectCls}>
                     {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -1360,6 +1598,9 @@ export default function AdminPage() {
                 </Field>
                 <Field label="Price (TZS)" required>
                   <input type="number" min={0} value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="85000" required className={inputCls} />
+                </Field>
+                <Field label="Sale Price">
+                  <input type="number" min={0} value={form.salePrice} onChange={(e) => setForm({ ...form, salePrice: e.target.value })} placeholder="Optional" className={inputCls} />
                 </Field>
               </div>
 

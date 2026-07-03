@@ -6,7 +6,8 @@ import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { formatTZS, type PDPProduct, type ProductColor } from "@/lib/products";
+import { formatTZS, effectivePrice, type PDPProduct, type ProductColor } from "@/lib/products";
+import type { Review } from "@/lib/reviews";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/context/ToastContext";
 import { useFocusTrap } from "@/lib/useFocusTrap";
@@ -126,6 +127,145 @@ function Lightbox({
   );
 }
 
+/* ── Star rating row ── */
+function Stars({ rating, size = "text-sm" }: { rating: number; size?: string }) {
+  return (
+    <span className={`${size} tracking-[0.15em] text-primary`} aria-label={`${rating} out of 5 stars`}>
+      {"★".repeat(Math.round(rating))}
+      <span className="text-mercury">{"★".repeat(5 - Math.round(rating))}</span>
+    </span>
+  );
+}
+
+/* ── Write-a-review form ── */
+function ReviewForm({ productId }: { productId: string }) {
+  const [author, setAuthor] = useState("");
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [body, setBody] = useState("");
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [state, setState] = useState<"idle" | "sending" | "done" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (rating === 0) {
+      setErrorMsg("Please select a star rating.");
+      setState("error");
+      return;
+    }
+    setState("sending");
+    try {
+      const form = new FormData();
+      form.append("productId", productId);
+      form.append("author", author);
+      form.append("rating", String(rating));
+      form.append("body", body);
+      if (photo) form.append("photo", photo);
+      const res = await fetch("/api/reviews", { method: "POST", body: form });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        setErrorMsg(json?.error ?? "Something went wrong. Please try again.");
+        setState("error");
+        return;
+      }
+      setState("done");
+    } catch {
+      setErrorMsg("Connection problem — please check your network and try again.");
+      setState("error");
+    }
+  }
+
+  if (state === "done") {
+    return (
+      <div className="border border-mercury p-6 text-center">
+        <p className="text-xs tracking-widest uppercase text-primary mb-1">Thank you ✓</p>
+        <p className="text-xs text-chicago leading-relaxed">
+          Your review has been submitted and will appear once it&apos;s approved.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="border border-mercury p-6 space-y-4">
+      <p className="text-xs tracking-widest uppercase text-primary">Write a Review</p>
+
+      {/* Star picker */}
+      <div className="flex items-center gap-1" role="radiogroup" aria-label="Rating">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            type="button"
+            role="radio"
+            aria-checked={rating === n}
+            aria-label={`${n} star${n > 1 ? "s" : ""}`}
+            onClick={() => { setRating(n); if (state === "error") setState("idle"); }}
+            onMouseEnter={() => setHoverRating(n)}
+            onMouseLeave={() => setHoverRating(0)}
+            className={`text-2xl leading-none transition-colors duration-100 ${
+              n <= (hoverRating || rating) ? "text-primary" : "text-mercury"
+            }`}
+          >
+            ★
+          </button>
+        ))}
+      </div>
+
+      <input
+        type="text"
+        value={author}
+        onChange={(e) => setAuthor(e.target.value)}
+        placeholder="Your name"
+        required
+        maxLength={60}
+        className="w-full border border-mercury px-3 py-3 text-sm focus:outline-none focus:border-primary transition-colors duration-200 placeholder:text-alto"
+      />
+
+      <textarea
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        placeholder="How's the fit, the fabric, the vibe?"
+        required
+        maxLength={1000}
+        rows={4}
+        className="w-full border border-mercury px-3 py-3 text-sm focus:outline-none focus:border-primary transition-colors duration-200 placeholder:text-alto resize-none"
+      />
+
+      {/* Optional photo */}
+      <div className="flex items-center gap-3">
+        <label className="text-xs tracking-widest uppercase text-chicago underline underline-offset-2 cursor-pointer hover:text-primary transition-colors duration-200">
+          {photo ? "Change photo" : "Add a photo (optional)"}
+          <input
+            type="file"
+            accept="image/jpeg,image/jpg,image/png,image/webp"
+            onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+            className="hidden"
+          />
+        </label>
+        {photo && (
+          <span className="text-xs text-chicago truncate max-w-[180px]">
+            {photo.name}
+            <button type="button" onClick={() => setPhoto(null)} aria-label="Remove photo" className="ml-2 text-primary">×</button>
+          </span>
+        )}
+      </div>
+
+      {state === "error" && (
+        <p role="alert" className="text-xs text-error tracking-wide">{errorMsg}</p>
+      )}
+
+      <button
+        type="submit"
+        disabled={state === "sending"}
+        className="btn-primary w-full sm:w-auto disabled:opacity-50"
+      >
+        {state === "sending" ? "Submitting..." : "Submit Review"}
+      </button>
+    </form>
+  );
+}
+
 /* ── Back-in-stock notify form (sold-out products) ── */
 function RestockNotifyForm({ productId }: { productId: string }) {
   const [phone, setPhone] = useState("");
@@ -210,9 +350,11 @@ function RestockNotifyForm({ productId }: { productId: string }) {
 export default function ProductPageClient({
   product,
   related = [],
+  reviews = [],
 }: {
   product: PDPProduct;
   related?: Product[];
+  reviews?: Review[];
 }) {
   const { addItem, openCart } = useCart();
   const { showToast } = useToast();
@@ -226,6 +368,9 @@ export default function ProductPageClient({
   );
   const [activeSlide, setActiveSlide] = useState(0);
   const carouselRef = useRef<HTMLDivElement>(null);
+  const atcRef = useRef<HTMLDivElement>(null);
+  const sizeSectionRef = useRef<HTMLDivElement>(null);
+  const [showStickyBar, setShowStickyBar] = useState(false);
 
   const heroImage = selectedColor?.image ?? product.images[0] ?? "";
 
@@ -233,12 +378,32 @@ export default function ProductPageClient({
   const soldOut = !product.isComingSoon && product.stock !== undefined && product.stock <= 0;
   const lowStock = !product.isComingSoon && product.stock !== undefined && product.stock > 0 && product.stock <= 5;
 
+  const price = effectivePrice(product);
+  const onSale = price < product.price;
+
+  const avgRating = reviews.length
+    ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+    : 0;
+
+  /* Sticky mobile bar appears once the main Add to Bag scrolls out of view */
+  useEffect(() => {
+    if (product.isComingSoon || soldOut) return;
+    const el = atcRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setShowStickyBar(!entry.isIntersecting && entry.boundingClientRect.top < 0),
+      { threshold: 0 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [product.isComingSoon, soldOut]);
+
   /* Log this product for the "Recently Viewed" strip */
   useEffect(() => {
     recordRecentlyViewed({
       id: product.id,
       name: product.name,
-      price: product.price,
+      price: effectivePrice(product),
       image: product.colors?.[0]?.image ?? product.images[0] ?? "",
     });
   }, [product]);
@@ -276,6 +441,7 @@ export default function ProductPageClient({
   function handleAddToBag() {
     if (!selectedSize && product.sizes.length > 1) {
       setSizeError(true);
+      sizeSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     addItem({
@@ -283,7 +449,7 @@ export default function ProductPageClient({
       name: product.name,
       size: selectedSize ?? "One Size",
       color: selectedColor?.name,
-      price: product.price,
+      price,
       image: heroImage,
     });
     openCart();
@@ -435,9 +601,25 @@ export default function ProductPageClient({
                 Good vibes defined.
               </p>
 
-              <p className={`font-display text-2xl font-semibold text-primary ${lowStock ? "mb-2" : "mb-6"}`}>
-                {formatTZS(product.price)}
-              </p>
+              {reviews.length > 0 && (
+                <a href="#reviews" className="flex items-center gap-2 mb-4 group w-fit">
+                  <Stars rating={avgRating} />
+                  <span className="text-xs text-chicago tracking-wide group-hover:text-primary transition-colors duration-200 underline underline-offset-2">
+                    {avgRating.toFixed(1)} ({reviews.length} {reviews.length === 1 ? "review" : "reviews"})
+                  </span>
+                </a>
+              )}
+
+              {onSale ? (
+                <p className={`font-display text-2xl font-semibold ${lowStock ? "mb-2" : "mb-6"}`}>
+                  <span className="text-error">{formatTZS(price)}</span>
+                  <span className="text-chicago line-through font-normal text-xl ml-3">{formatTZS(product.price)}</span>
+                </p>
+              ) : (
+                <p className={`font-display text-2xl font-semibold text-primary ${lowStock ? "mb-2" : "mb-6"}`}>
+                  {formatTZS(product.price)}
+                </p>
+              )}
 
               {lowStock && (
                 <p className="text-xs tracking-widest uppercase text-error mb-6">
@@ -482,7 +664,7 @@ export default function ProductPageClient({
 
               {/* Size selector — correct ARIA: radiogroup + radio */}
               {product.sizes.length > 1 && (
-                <div className="mb-7">
+                <div className="mb-7" ref={sizeSectionRef}>
                   <div className="flex items-baseline justify-between mb-3">
                     <p className="text-xs tracking-widest uppercase text-primary">
                       Size
@@ -534,7 +716,7 @@ export default function ProductPageClient({
               )}
 
               {/* Add to Bag + wishlist */}
-              <div className="flex items-stretch gap-2">
+              <div className="flex items-stretch gap-2" ref={atcRef}>
                 {product.isComingSoon ? (
                   <button
                     disabled
@@ -568,7 +750,7 @@ export default function ProductPageClient({
                   item={{
                     id: product.id,
                     name: product.name,
-                    price: product.price,
+                    price,
                     image: product.colors?.[0]?.image ?? product.images[0] ?? "",
                   }}
                 />
@@ -612,6 +794,61 @@ export default function ProductPageClient({
           </div>
         </div>
 
+        {/* ── Reviews ── */}
+        <section
+          id="reviews"
+          aria-label="Customer reviews"
+          className="max-w-screen-2xl mx-auto px-6 md:px-10 lg:px-16 py-14 md:py-16 border-t border-mercury scroll-mt-24"
+        >
+          <div className="max-w-2xl">
+            <div className="flex items-baseline justify-between mb-8">
+              <h2 className="heading-section">Reviews</h2>
+              {reviews.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Stars rating={avgRating} />
+                  <span className="text-xs text-chicago tracking-wide">
+                    {avgRating.toFixed(1)} · {reviews.length} {reviews.length === 1 ? "review" : "reviews"}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {reviews.length === 0 && (
+              <p className="text-sm text-chicago tracking-wide mb-8">
+                No reviews yet — be the first to share how it fits.
+              </p>
+            )}
+
+            <div className="space-y-8 mb-10">
+              {reviews.map((r) => (
+                <article key={r.id} className="border-b border-mercury pb-8 last:border-b-0">
+                  <div className="flex items-baseline justify-between gap-4 mb-1.5">
+                    <Stars rating={r.rating} />
+                    <span className="text-[11px] text-chicago tracking-wide shrink-0">
+                      {new Date(r.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                    </span>
+                  </div>
+                  <p className="text-xs tracking-widest uppercase text-primary mb-2">{r.author}</p>
+                  <p className="text-sm text-mine leading-relaxed tracking-wide">{r.body}</p>
+                  {r.photo_url && (
+                    <div className="relative w-24 h-24 mt-3 bg-smoke">
+                      <Image
+                        src={r.photo_url}
+                        alt={`Photo from ${r.author}'s review`}
+                        fill
+                        sizes="96px"
+                        className="object-cover"
+                      />
+                    </div>
+                  )}
+                </article>
+              ))}
+            </div>
+
+            <ReviewForm productId={product.id} />
+          </div>
+        </section>
+
         {/* ── You May Also Like ── */}
         {related.length > 0 && (
           <section
@@ -632,6 +869,42 @@ export default function ProductPageClient({
       </main>
 
       <Footer />
+
+      {/* ── Sticky mobile Add to Bag — appears when the main button scrolls away ── */}
+      {!product.isComingSoon && !soldOut && (
+      <div
+        className={[
+          "lg:hidden fixed bottom-0 inset-x-0 z-[70] bg-white border-t border-mercury",
+          "px-4 py-3 flex items-center gap-3 transition-transform duration-300 ease-out",
+          showStickyBar ? "translate-y-0" : "translate-y-full",
+        ].join(" ")}
+        aria-hidden={!showStickyBar}
+      >
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-primary truncate tracking-wide">{product.name}</p>
+          <p className="text-xs tracking-wide">
+            {onSale ? (
+              <>
+                <span className="text-error">{formatTZS(price)}</span>
+                <span className="text-chicago line-through ml-1.5">{formatTZS(product.price)}</span>
+              </>
+            ) : (
+              <span className="text-chicago">{formatTZS(product.price)}</span>
+            )}
+          </p>
+        </div>
+        <button
+          onClick={handleAddToBag}
+          tabIndex={showStickyBar ? 0 : -1}
+          className={[
+            "shrink-0 px-6 py-3 text-xs tracking-widest uppercase transition-colors duration-200",
+            added ? "bg-success text-white" : "bg-primary text-white hover:bg-charcoal",
+          ].join(" ")}
+        >
+          {added ? "Added ✓" : "Add to Bag"}
+        </button>
+      </div>
+      )}
 
       <AnimatePresence>
         {lightboxSrc && (

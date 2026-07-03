@@ -3,6 +3,7 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { getProducts } from "@/lib/data";
+import { getApprovedReviews } from "@/lib/reviews";
 import type { PDPProduct } from "@/lib/products";
 import type { Product } from "@/components/ProductCard";
 import ProductPageClient from "./ProductPageClient";
@@ -12,6 +13,7 @@ function toCard(p: PDPProduct): Product {
     id: p.id,
     name: p.name,
     price: p.price,
+    salePrice: p.salePrice,
     href: `/product/${p.id}`,
     badge: p.badge,
     image: p.colors?.[0]?.image ?? p.images[0],
@@ -46,7 +48,7 @@ export default async function ProductPage(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const products = await getProducts();
+  const [products, reviews] = await Promise.all([getProducts(), getApprovedReviews(id)]);
   const product = products.find((p) => p.id === id) ?? null;
 
   if (!product) {
@@ -78,5 +80,5 @@ export default async function ProductPage(
     .slice(0, 4)
     .map(toCard);
 
-  return <ProductPageClient product={product} related={related} />;
+  return <ProductPageClient product={product} related={related} reviews={reviews} />;
 }
