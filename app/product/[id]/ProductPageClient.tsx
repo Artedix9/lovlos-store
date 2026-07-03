@@ -130,11 +130,17 @@ function Lightbox({
 function RestockNotifyForm({ productId }: { productId: string }) {
   const [phone, setPhone] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "done" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  function fail(msg: string) {
+    setErrorMsg(msg);
+    setState("error");
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (phone.replace(/\D/g, "").length < 9) {
-      setState("error");
+      fail("Please enter a valid phone number and try again.");
       return;
     }
     setState("sending");
@@ -144,10 +150,14 @@ function RestockNotifyForm({ productId }: { productId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ productId, phone }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        fail(json?.error ?? "Something went wrong. Please try again.");
+        return;
+      }
       setState("done");
     } catch {
-      setState("error");
+      fail("Connection problem — please check your network and try again.");
     }
   }
 
@@ -189,7 +199,7 @@ function RestockNotifyForm({ productId }: { productId: string }) {
       </form>
       {state === "error" && (
         <p role="alert" className="mt-2 text-xs text-error tracking-wide">
-          Please enter a valid phone number and try again.
+          {errorMsg}
         </p>
       )}
     </div>
