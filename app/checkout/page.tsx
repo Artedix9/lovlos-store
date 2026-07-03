@@ -10,6 +10,7 @@ import { useCart } from "@/context/CartContext";
 import { formatTZS } from "@/lib/products";
 import { buildWhatsAppUrl, generateOrderId } from "@/lib/orders";
 import type { OrderPayload, SavedOrder } from "@/lib/orders";
+import { deliveryFeeFor } from "@/lib/delivery";
 
 const CITIES = [
   "Dar es Salaam",
@@ -22,9 +23,6 @@ const CITIES = [
   "Morogoro",
   "Other",
 ];
-
-const DELIVERY_FEE = 5000;
-const FREE_DELIVERY_THRESHOLD = 150000;
 
 interface FormState {
   name: string;
@@ -41,24 +39,28 @@ interface FormErrors {
   email?: string;
 }
 
-/* ── Field wrapper ── */
+/* ── Field wrapper — wires label, control, and error together for AT ── */
 function Field({
+  id,
   label,
   error,
   children,
 }: {
+  id: string;
   label: string;
   error?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <label className="text-[10px] font-bold tracking-ultra uppercase text-zinc-600">
+      <label htmlFor={id} className="text-[10px] font-bold tracking-ultra uppercase text-chicago">
         {label}
       </label>
       {children}
       {error && (
-        <p className="text-[11px] text-red-500 tracking-wide">{error}</p>
+        <p id={`${id}-error`} className="text-[11px] text-error tracking-wide">
+          {error}
+        </p>
       )}
     </div>
   );
@@ -66,11 +68,11 @@ function Field({
 
 const inputCls = (hasError?: string) =>
   [
-    "w-full bg-white border text-sm text-zinc-900 px-4 py-3.5 outline-none",
-    "placeholder:text-zinc-400 tracking-wide transition-all duration-200",
+    "w-full bg-white border text-sm text-primary px-4 py-3.5 outline-none",
+    "placeholder:text-chicago tracking-wide transition-all duration-200",
     hasError
-      ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
-      : "border-zinc-900 focus:border-zinc-700 focus:ring-2 focus:ring-zinc-900/10",
+      ? "border-error focus:border-error focus:ring-2 focus:ring-error/20"
+      : "border-primary focus:border-mine focus:ring-2 focus:ring-primary/10",
   ].join(" ");
 
 export default function CheckoutPage() {
@@ -89,10 +91,10 @@ export default function CheckoutPage() {
   const [placing, setPlacing] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
-  const deliveryFee = subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE;
+  const deliveryFee = deliveryFeeFor(subtotal);
   const total = subtotal + deliveryFee;
 
-  function validate(): boolean {
+  function validate(): FormErrors {
     const next: FormErrors = {};
     if (!form.name.trim()) next.name = "Full name is required.";
     if (!form.phone.trim()) {
@@ -103,8 +105,7 @@ export default function CheckoutPage() {
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
       next.email = "Enter a valid email address.";
     }
-    setErrors(next);
-    return Object.keys(next).length === 0;
+    return next;
   }
 
   function handleChange(
@@ -120,7 +121,18 @@ export default function CheckoutPage() {
 
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!validate()) return;
+    const nextErrors = validate();
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      /* Move keyboard/AT users straight to the first invalid field */
+      const firstInvalid = ["name", "phone", "email"].find(
+        (key) => nextErrors[key as keyof FormErrors]
+      );
+      if (firstInvalid) {
+        (document.getElementById(`checkout-${firstInvalid}`) as HTMLElement | null)?.focus();
+      }
+      return;
+    }
     setPlacing(true);
     setApiError(null);
 
@@ -173,8 +185,8 @@ export default function CheckoutPage() {
       <>
         <Header />
         <main className="min-h-[60vh] flex flex-col items-center justify-center gap-4 px-6 text-center bg-white">
-          <p className="text-xs font-bold uppercase tracking-ultra text-zinc-500">Your bag is empty</p>
-          <h1 className="font-sans text-3xl font-black uppercase tracking-tight text-zinc-950">Nothing to check out</h1>
+          <p className="text-xs font-bold uppercase tracking-ultra text-chicago">Your bag is empty</p>
+          <h1 className="font-display text-3xl font-black uppercase tracking-tight text-primary">Nothing to check out</h1>
           <Link href="/" className="btn-primary mt-4">Continue Shopping</Link>
         </main>
         <Footer />
@@ -186,15 +198,15 @@ export default function CheckoutPage() {
     <>
       <Header />
 
-      <main id="main-content" className="min-h-screen bg-[#FDFDFD]">
+      <main id="main-content" className="min-h-screen bg-surface">
         <div className="max-w-7xl mx-auto px-6 md:px-10 lg:px-16 py-14">
 
           {/* Page title */}
           <div className="mb-10">
-            <p className="text-[10px] tracking-ultra uppercase text-zinc-500 font-sans mb-2">
+            <p className="text-[10px] tracking-ultra uppercase text-chicago font-sans mb-2">
               Almost there
             </p>
-            <h1 className="font-display text-3xl md:text-4xl font-black uppercase tracking-tighter text-zinc-950">
+            <h1 className="font-display text-3xl md:text-4xl font-black uppercase tracking-tighter text-primary">
               Checkout
             </h1>
           </div>
@@ -209,68 +221,90 @@ export default function CheckoutPage() {
 
               {/* Delivery Info */}
               <section>
-                <h2 className="text-xs font-black uppercase tracking-ultra text-zinc-950 mb-6 pb-3 border-b border-zinc-200">
+                <h2 className="text-xs font-black uppercase tracking-ultra text-primary mb-6 pb-3 border-b border-mercury">
                   Delivery Information
                 </h2>
 
                 <div className="space-y-5">
-                  <Field label="Full Name *" error={errors.name}>
+                  <Field id="checkout-name" label="Full Name *" error={errors.name}>
                     <input
+                      id="checkout-name"
                       type="text"
                       name="name"
                       value={form.name}
                       onChange={handleChange}
                       autoComplete="name"
                       placeholder="e.g. Amara Osei"
+                      aria-invalid={errors.name ? true : undefined}
+                      aria-describedby={errors.name ? "checkout-name-error" : undefined}
                       className={inputCls(errors.name)}
                     />
                   </Field>
 
-                  <Field label="Phone Number *" error={errors.phone}>
+                  <Field id="checkout-phone" label="Phone Number *" error={errors.phone}>
                     <input
+                      id="checkout-phone"
                       type="tel"
                       name="phone"
                       value={form.phone}
                       onChange={handleChange}
                       autoComplete="tel"
                       placeholder="+255 746 704 036"
+                      aria-invalid={errors.phone ? true : undefined}
+                      aria-describedby={errors.phone ? "checkout-phone-error" : undefined}
                       className={inputCls(errors.phone)}
                     />
                   </Field>
 
-                  <Field label="Email Address (optional)" error={errors.email}>
+                  <Field id="checkout-email" label="Email Address (optional)" error={errors.email}>
                     <input
+                      id="checkout-email"
                       type="email"
                       name="email"
                       value={form.email}
                       onChange={handleChange}
                       autoComplete="email"
                       placeholder="you@example.com"
+                      aria-invalid={errors.email ? true : undefined}
+                      aria-describedby={errors.email ? "checkout-email-error" : undefined}
                       className={inputCls(errors.email)}
                     />
                   </Field>
 
-                  <Field label="City / Delivery Area">
-                    <select
-                      name="city"
-                      value={form.city}
-                      onChange={handleChange}
-                      className="w-full bg-white border border-zinc-900 text-sm text-zinc-900 px-4 py-3.5 outline-none focus:border-zinc-700 focus:ring-2 focus:ring-zinc-900/10 transition-all duration-200 cursor-pointer appearance-none"
-                    >
-                      {CITIES.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
+                  <Field id="checkout-city" label="City / Delivery Area">
+                    <div className="relative">
+                      <select
+                        id="checkout-city"
+                        name="city"
+                        value={form.city}
+                        onChange={handleChange}
+                        className="w-full bg-white border border-primary text-sm text-primary px-4 py-3.5 pr-10 outline-none focus:border-mine focus:ring-2 focus:ring-primary/10 transition-all duration-200 cursor-pointer appearance-none"
+                      >
+                        {CITIES.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                      {/* Chevron — appearance-none removes the native indicator */}
+                      <svg
+                        className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-primary"
+                        width="14" height="14" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+                        strokeLinejoin="round" aria-hidden="true"
+                      >
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                    </div>
                   </Field>
 
-                  <Field label="Delivery Note (optional)">
+                  <Field id="checkout-note" label="Delivery Note (optional)">
                     <textarea
+                      id="checkout-note"
                       name="note"
                       value={form.note}
                       onChange={handleChange}
                       rows={3}
                       placeholder="Landmark, building name, gate colour…"
-                      className="w-full bg-white border border-zinc-900 text-sm text-zinc-900 px-4 py-3.5 outline-none focus:border-zinc-700 focus:ring-2 focus:ring-zinc-900/10 transition-all duration-200 placeholder:text-zinc-400 resize-none tracking-wide"
+                      className="w-full bg-white border border-primary text-sm text-primary px-4 py-3.5 outline-none focus:border-mine focus:ring-2 focus:ring-primary/10 transition-all duration-200 placeholder:text-chicago resize-none tracking-wide"
                     />
                   </Field>
                 </div>
@@ -278,11 +312,11 @@ export default function CheckoutPage() {
 
               {/* Payment Method */}
               <section>
-                <h2 className="text-xs font-black uppercase tracking-ultra text-zinc-950 mb-6 pb-3 border-b border-zinc-200">
+                <h2 className="text-xs font-black uppercase tracking-ultra text-primary mb-6 pb-3 border-b border-mercury">
                   Payment Method
                 </h2>
 
-                <div className="space-y-3">
+                <div className="space-y-3" role="radiogroup" aria-label="Payment method">
                   {[
                     {
                       value: "mobile-money",
@@ -299,9 +333,10 @@ export default function CheckoutPage() {
                       key={option.value}
                       className={[
                         "flex items-start gap-4 p-4 border cursor-pointer transition-colors duration-150",
+                        "focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-1",
                         form.payment === option.value
-                          ? "border-zinc-900 bg-zinc-50"
-                          : "border-zinc-200 hover:border-zinc-400",
+                          ? "border-primary bg-smoke/60"
+                          : "border-mercury hover:border-chicago",
                       ].join(" ")}
                     >
                       <input
@@ -310,13 +345,13 @@ export default function CheckoutPage() {
                         value={option.value}
                         checked={form.payment === option.value}
                         onChange={handleChange}
-                        className="mt-0.5 accent-zinc-900 shrink-0"
+                        className="mt-0.5 accent-black shrink-0"
                       />
                       <div>
-                        <p className="text-sm font-bold uppercase tracking-tight text-zinc-950">
+                        <p className="text-sm font-bold uppercase tracking-tight text-primary">
                           {option.label}
                         </p>
-                        <p className="text-xs text-zinc-500 tracking-wide mt-0.5">
+                        <p className="text-xs text-chicago tracking-wide mt-0.5">
                           {option.sub}
                         </p>
                       </div>
@@ -325,19 +360,19 @@ export default function CheckoutPage() {
                 </div>
 
                 {form.payment === "mobile-money" && (
-                  <div className="mt-4 border border-zinc-900 bg-zinc-50 px-4 py-4 space-y-3">
-                    <p className="text-[10px] font-bold tracking-ultra uppercase text-zinc-500">
+                  <div className="mt-4 border border-primary bg-smoke/60 px-4 py-4 space-y-3">
+                    <p className="text-[10px] font-bold tracking-ultra uppercase text-chicago">
                       Payment Details
                     </p>
-                    <div className="flex justify-between items-baseline border-b border-zinc-200 pb-2.5">
-                      <span className="text-[10px] tracking-widest uppercase text-zinc-500">Lipa Number</span>
-                      <span className="text-sm font-black tracking-tight text-zinc-950">70019014</span>
+                    <div className="flex justify-between items-baseline border-b border-mercury pb-2.5">
+                      <span className="text-[10px] tracking-widest uppercase text-chicago">Lipa Number</span>
+                      <span className="text-sm font-black tracking-tight text-primary">70019014</span>
                     </div>
                     <div className="flex justify-between items-baseline">
-                      <span className="text-[10px] tracking-widest uppercase text-zinc-500">Name</span>
-                      <span className="text-sm font-bold text-zinc-900 tracking-wide">Edrick Katabarula</span>
+                      <span className="text-[10px] tracking-widest uppercase text-chicago">Name</span>
+                      <span className="text-sm font-bold text-primary tracking-wide">Edrick Katabarula</span>
                     </div>
-                    <p className="text-[11px] text-zinc-500 tracking-wide leading-relaxed pt-1 border-t border-zinc-200">
+                    <p className="text-[11px] text-chicago tracking-wide leading-relaxed pt-1 border-t border-mercury">
                       After placing your order, WhatsApp will open with your invoice. Send your payment screenshot to confirm.
                     </p>
                   </div>
@@ -346,7 +381,7 @@ export default function CheckoutPage() {
 
               {/* API error */}
               {apiError && (
-                <p className="text-sm text-red-600 tracking-wide border border-red-300 bg-red-50 px-4 py-3">
+                <p role="alert" className="text-sm text-error tracking-wide border border-error/40 bg-error-tint px-4 py-3">
                   {apiError}
                 </p>
               )}
@@ -358,16 +393,16 @@ export default function CheckoutPage() {
             </div>
 
             {/* ══ RIGHT — Order Summary ══ */}
-            <div className="lg:sticky lg:top-24 space-y-0 bg-zinc-50 p-6">
-              <h2 className="text-xs font-black uppercase tracking-ultra text-zinc-950 mb-6 pb-3 border-b border-zinc-200">
+            <div className="lg:sticky space-y-0 bg-smoke/60 p-6" style={{ top: "var(--shell-top)" }}>
+              <h2 className="text-xs font-black uppercase tracking-ultra text-primary mb-6 pb-3 border-b border-mercury">
                 Order Summary
               </h2>
 
               {/* Items */}
-              <ul className="divide-y divide-zinc-100">
+              <ul className="divide-y divide-mercury/60">
                 {items.map((item) => (
                   <li key={`${item.id}-${item.size}-${item.color ?? ""}`} className="flex gap-4 py-4">
-                    <div className="relative w-16 h-20 shrink-0 bg-zinc-100 overflow-hidden">
+                    <div className="relative w-16 h-20 shrink-0 bg-smoke overflow-hidden">
                       <Image
                         src={item.image}
                         alt={item.name}
@@ -375,24 +410,24 @@ export default function CheckoutPage() {
                         sizes="64px"
                         className="object-cover object-top"
                       />
-                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-zinc-950 text-white text-[10px] flex items-center justify-center rounded-full leading-none font-bold">
+                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-white text-[10px] flex items-center justify-center rounded-full leading-none font-bold">
                         {item.quantity}
                       </span>
                     </div>
                     <div className="flex-1 flex flex-col justify-center gap-1 min-w-0">
-                      <p className="text-xs font-bold uppercase tracking-tight truncate text-zinc-900">
+                      <p className="text-xs font-bold uppercase tracking-tight truncate text-primary">
                         {item.name}
                       </p>
-                      <p className="text-[10px] tracking-widest uppercase text-zinc-500">
+                      <p className="text-[10px] tracking-widest uppercase text-chicago">
                         Size: {item.size}
                       </p>
                       {item.color && (
-                        <p className="text-[10px] tracking-widest uppercase text-zinc-500">
+                        <p className="text-[10px] tracking-widest uppercase text-chicago">
                           Colour: {item.color}
                         </p>
                       )}
                     </div>
-                    <p className="text-sm text-zinc-700 shrink-0 self-center">
+                    <p className="text-sm text-mine shrink-0 self-center">
                       {formatTZS(item.price * item.quantity)}
                     </p>
                   </li>
@@ -400,22 +435,22 @@ export default function CheckoutPage() {
               </ul>
 
               {/* Totals */}
-              <div className="pt-4 space-y-3 border-t border-zinc-200">
+              <div className="pt-4 space-y-3 border-t border-mercury">
                 <div className="flex justify-between text-sm">
-                  <span className="text-zinc-500 tracking-wide">Subtotal</span>
-                  <span className="text-zinc-700">{formatTZS(subtotal)}</span>
+                  <span className="text-chicago tracking-wide">Subtotal</span>
+                  <span className="text-mine">{formatTZS(subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-zinc-500 tracking-wide">Delivery</span>
-                  <span className="text-zinc-700">
+                  <span className="text-chicago tracking-wide">Delivery</span>
+                  <span className="text-mine">
                     {deliveryFee === 0 ? (
-                      <span className="text-green-600 font-bold tracking-wide">Free</span>
+                      <span className="text-success font-bold tracking-wide">Free</span>
                     ) : (
                       formatTZS(deliveryFee)
                     )}
                   </span>
                 </div>
-                <div className="flex justify-between text-base font-black uppercase tracking-tight pt-2 border-t border-zinc-200 text-zinc-950">
+                <div className="flex justify-between text-base font-black uppercase tracking-tight pt-2 border-t border-mercury text-primary">
                   <span>Total</span>
                   <span>{formatTZS(total)}</span>
                 </div>
@@ -426,7 +461,7 @@ export default function CheckoutPage() {
                 <PlaceOrderButton placing={placing} />
               </div>
 
-              <p className="text-[10px] tracking-widest uppercase text-zinc-400 text-center pt-3">
+              <p className="text-[10px] tracking-widest uppercase text-chicago text-center pt-3">
                 Secure · No card required
               </p>
             </div>
@@ -444,7 +479,7 @@ function PlaceOrderButton({ placing }: { placing: boolean }) {
     <button
       type="submit"
       disabled={placing}
-      className="w-full bg-zinc-950 text-white text-xs font-black tracking-[0.15em] uppercase py-6 px-8 flex items-center justify-center hover:bg-zinc-800 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+      className="w-full bg-primary text-white text-xs font-black tracking-widest uppercase py-5 px-8 flex items-center justify-center hover:bg-charcoal transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {placing ? "Placing Order…" : "Place Order"}
     </button>

@@ -4,15 +4,18 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 import { formatTZS } from "@/lib/products";
+import { FREE_DELIVERY_THRESHOLD, deliveryFeeFor } from "@/lib/delivery";
 
 const TRANSITION_MS = 300;
 
 export default function CartDrawer() {
-  const { items, isOpen, closeCart, updateQuantity, totalItems, subtotal } =
+  const { items, isOpen, closeCart, updateQuantity, removeItem, totalItems, subtotal } =
     useCart();
 
   const [mounted, setMounted] = useState(false);
+  const panelRef = useFocusTrap<HTMLElement>(isOpen, closeCart);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
@@ -46,6 +49,7 @@ export default function CartDrawer() {
 
       {/* ── Drawer panel ── */}
       <aside
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label="Shopping bag"
@@ -65,7 +69,7 @@ export default function CartDrawer() {
               Your Bag
             </h2>
             {totalItems > 0 && (
-              <span className="text-xs text-white/40 tracking-widest">
+              <span className="text-xs text-white/60 tracking-widest">
                 {totalItems} {totalItems === 1 ? "item" : "items"}
               </span>
             )}
@@ -73,7 +77,7 @@ export default function CartDrawer() {
           <button
             onClick={closeCart}
             aria-label="Close cart"
-            className="text-white/40 hover:text-white transition-colors duration-200 p-1 -mr-1"
+            className="text-white/60 hover:text-white transition-colors duration-200 p-2 -mr-2"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
@@ -92,7 +96,7 @@ export default function CartDrawer() {
                 <p className="text-sm font-black uppercase tracking-widest text-white">
                   Your bag is empty.
                 </p>
-                <p className="text-xs font-light tracking-ultra uppercase text-white/40">
+                <p className="text-xs font-light tracking-ultra uppercase text-white/60">
                   Own your vibe.
                 </p>
               </div>
@@ -128,11 +132,11 @@ export default function CartDrawer() {
                       <p className="text-xs font-bold uppercase tracking-tight text-white leading-snug truncate">
                         {item.name}
                       </p>
-                      <p className="text-[10px] tracking-widest uppercase text-white/40 mt-0.5">
+                      <p className="text-[10px] tracking-widest uppercase text-white/60 mt-0.5">
                         Size: {item.size}
                       </p>
                       {item.color && (
-                        <p className="text-[10px] tracking-widest uppercase text-white/40 mt-0.5">
+                        <p className="text-[10px] tracking-widest uppercase text-white/60 mt-0.5">
                           Colour: {item.color}
                         </p>
                       )}
@@ -141,24 +145,33 @@ export default function CartDrawer() {
                       </p>
                     </div>
 
-                    {/* Quantity controls */}
-                    <div className="flex items-center mt-2 border border-white/10 w-fit">
+                    {/* Quantity controls + remove */}
+                    <div className="flex items-center gap-4 mt-2">
+                      <div className="flex items-center border border-white/10 w-fit">
+                        <button
+                          aria-label={`Decrease quantity of ${item.name}`}
+                          onClick={() => updateQuantity(item.id, item.size, item.color, -1)}
+                          className="w-8 h-8 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/5 transition-colors duration-150 text-base leading-none focus-visible:outline-none focus-visible:bg-white/10"
+                        >
+                          −
+                        </button>
+                        <span className="w-8 h-8 flex items-center justify-center text-xs text-white font-bold border-x border-white/10">
+                          {item.quantity}
+                        </span>
+                        <button
+                          aria-label={`Increase quantity of ${item.name}`}
+                          onClick={() => updateQuantity(item.id, item.size, item.color, +1)}
+                          className="w-8 h-8 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/5 transition-colors duration-150 text-base leading-none focus-visible:outline-none focus-visible:bg-white/10"
+                        >
+                          +
+                        </button>
+                      </div>
                       <button
-                        aria-label="Decrease quantity"
-                        onClick={() => updateQuantity(item.id, item.size, item.color, -1)}
-                        className="w-8 h-8 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 transition-colors duration-150 text-base leading-none focus-visible:outline-none focus-visible:bg-white/10"
+                        onClick={() => removeItem(item.id, item.size, item.color)}
+                        aria-label={`Remove ${item.name} from bag`}
+                        className="text-[10px] tracking-widest uppercase text-white/60 hover:text-white underline underline-offset-2 transition-colors duration-150 py-2"
                       >
-                        −
-                      </button>
-                      <span className="w-8 h-8 flex items-center justify-center text-xs text-white font-bold border-x border-white/10">
-                        {item.quantity}
-                      </span>
-                      <button
-                        aria-label="Increase quantity"
-                        onClick={() => updateQuantity(item.id, item.size, item.color, +1)}
-                        className="w-8 h-8 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 transition-colors duration-150 text-base leading-none focus-visible:outline-none focus-visible:bg-white/10"
-                      >
-                        +
+                        Remove
                       </button>
                     </div>
                   </div>
@@ -176,18 +189,60 @@ export default function CartDrawer() {
         {/* ── Footer ── */}
         {items.length > 0 && (
           <div className="shrink-0 border-t border-white/[0.08] px-6 py-6 space-y-5 bg-primary">
-            <div className="flex items-baseline justify-between">
-              <span className="text-xs font-bold uppercase tracking-ultra text-white/50">
-                Subtotal
-              </span>
-              <span className="text-base font-bold text-white tracking-tight">
-                {formatTZS(subtotal)}
-              </span>
+            {/* Free-delivery progress */}
+            <div aria-live="polite">
+              {subtotal >= FREE_DELIVERY_THRESHOLD ? (
+                <p className="text-[11px] font-bold tracking-widest uppercase text-white flex items-center gap-2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  You&apos;ve unlocked free delivery
+                </p>
+              ) : (
+                <p className="text-[11px] tracking-widest uppercase text-white/70">
+                  Add{" "}
+                  <span className="font-bold text-white">
+                    {formatTZS(FREE_DELIVERY_THRESHOLD - subtotal)}
+                  </span>{" "}
+                  more for free delivery
+                </p>
+              )}
+              <div className="mt-2.5 h-1 bg-white/10 overflow-hidden" aria-hidden="true">
+                <div
+                  className="h-full bg-white transition-[width] duration-500 ease-out"
+                  style={{ width: `${Math.min((subtotal / FREE_DELIVERY_THRESHOLD) * 100, 100)}%` }}
+                />
+              </div>
             </div>
 
-            <p className="text-[10px] tracking-widest uppercase text-white/30">
-              Shipping &amp; taxes calculated at checkout
-            </p>
+            {/* Totals — delivery fee is known up front, so show the real total */}
+            <div className="space-y-2.5">
+              <div className="flex items-baseline justify-between">
+                <span className="text-[10px] tracking-widest uppercase text-white/50">
+                  Subtotal
+                </span>
+                <span className="text-xs text-white/70 tracking-wide">
+                  {formatTZS(subtotal)}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-[10px] tracking-widest uppercase text-white/50">
+                  Delivery
+                </span>
+                <span className="text-xs text-white/70 tracking-wide">
+                  {deliveryFeeFor(subtotal) === 0 ? "Free" : formatTZS(deliveryFeeFor(subtotal))}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between pt-2.5 border-t border-white/[0.08]">
+                <span className="text-xs font-bold uppercase tracking-ultra text-white/60">
+                  Total
+                </span>
+                <span className="text-base font-bold text-white tracking-tight">
+                  {formatTZS(subtotal + deliveryFeeFor(subtotal))}
+                </span>
+              </div>
+            </div>
 
             <Link
               href="/checkout"
@@ -199,7 +254,7 @@ export default function CartDrawer() {
 
             <button
               onClick={closeCart}
-              className="block w-full text-center text-[10px] tracking-widest uppercase text-white/30 hover:text-white/60 transition-colors duration-200 pt-1"
+              className="block w-full text-center text-[10px] tracking-widest uppercase text-white/50 hover:text-white transition-colors duration-200 pt-1"
             >
               Continue Shopping
             </button>
