@@ -4,10 +4,13 @@ import {
   createContext,
   useContext,
   useState,
+  useEffect,
   useCallback,
   useMemo,
   type ReactNode,
 } from "react";
+
+const STORAGE_KEY = "lovlos-cart";
 
 export interface CartItem {
   id: string;       // product id (slug)
@@ -28,6 +31,8 @@ interface CartContextValue {
   addItem: (item: Omit<CartItem, "quantity">) => void;
   /** Apply +1 / -1 delta; removes item when quantity reaches 0 */
   updateQuantity: (id: string, size: string, color: string | undefined, delta: number) => void;
+  /** Remove a line item entirely regardless of quantity */
+  removeItem: (id: string, size: string, color: string | undefined) => void;
   /** Empty the cart entirely (called on order placement) */
   clearCart: () => void;
   totalItems: number;
@@ -39,6 +44,30 @@ const CartContext = createContext<CartContextValue | null>(null);
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  /* Restore the bag from localStorage after mount (avoids hydration mismatch) */
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed: unknown = JSON.parse(raw);
+        if (Array.isArray(parsed)) setItems(parsed as CartItem[]);
+      }
+    } catch {
+      /* corrupt or unavailable storage — start with an empty bag */
+    }
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    } catch {
+      /* storage full or unavailable — cart still works in-memory */
+    }
+  }, [items, hydrated]);
 
   const openCart = useCallback(() => setIsOpen(true), []);
   const closeCart = useCallback(() => setIsOpen(false), []);
@@ -74,6 +103,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const removeItem = useCallback(
+    (id: string, size: string, color: string | undefined) => {
+      setItems((prev) =>
+        prev.filter(
+          (item) => !(item.id === id && item.size === size && item.color === color)
+        )
+      );
+    },
+    []
+  );
+
   const totalItems = useMemo(
     () => items.reduce((sum, i) => sum + i.quantity, 0),
     [items]
@@ -93,10 +133,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
       addItem,
       clearCart,
       updateQuantity,
+      removeItem,
       totalItems,
       subtotal,
     }),
-    [items, isOpen, openCart, closeCart, addItem, clearCart, updateQuantity, totalItems, subtotal]
+    [items, isOpen, openCart, closeCart, addItem, clearCart, updateQuantity, removeItem, totalItems, subtotal]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

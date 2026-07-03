@@ -16,10 +16,26 @@
   --highlight-light: #f1e8dd;
   --highlight-medium: #ceb18f;
 
-  /* Layout measurements — keep in sync with header markup */
+  /* Semantic state colors — ≥4.5:1 on white */
+  --success: #4a6741;
+  --success-deep: #3c4b37;
+  --success-tint: #d8e1d5;
+  --error: #b42318;
+  --error-tint: #fbeeec;
+  --surface: #fafafa;
+
+  /* Layout measurements — keep in sync with header markup.
+     Only the <header> is sticky; the announcement bar scrolls away,
+     so sticky offsets must use --header-h alone. */
   --announce-h: 36px;
-  --header-h: 64px;
-  --shell-top: calc(var(--announce-h) + var(--header-h) + 16px);
+  --header-h: 56px; /* h-14 mobile */
+  --shell-top: calc(var(--header-h) + 16px);
+}
+
+@media (min-width: 768px) {
+  :root {
+    --header-h: 64px; /* h-16 from md: up */
+  }
 }
 
 @layer base {
@@ -54,6 +70,20 @@
   :focus:not(:focus-visible) {
     outline: none;
   }
+
+  /* Honour the user's motion preference globally (WCAG 2.3.3) */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }
 
 @layer utilities {
@@ -77,9 +107,19 @@
     letter-spacing: 0.3em;
   }
 
+  /* In-page anchor targets clear the sticky header when scrolled to */
+  .anchor-target {
+    scroll-margin-top: calc(var(--header-h) + 16px);
+  }
+
   .nav-link {
     @apply text-xs tracking-widest uppercase text-primary transition-colors duration-200 hover:text-chicago;
     @apply rounded-sm;
+  }
+
+  /* Canonical section heading — every section title uses this recipe */
+  .heading-section {
+    @apply font-display text-2xl md:text-3xl font-bold uppercase tracking-tight text-primary;
   }
 
   .btn-primary {

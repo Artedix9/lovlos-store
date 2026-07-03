@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import CategoryShell from "@/components/CategoryShell";
 import type { CategoryTile } from "@/components/CategoryShell";
+import ProductGridSkeleton from "@/components/ProductGridSkeleton";
 import { getProducts } from "@/lib/data";
 import { getHeroImages } from "@/lib/hero";
 import type { Product } from "@/components/ProductCard";
@@ -17,24 +18,9 @@ export const metadata: Metadata = {
 };
 
 const TILES: CategoryTile[] = [
-  {
-    label: "Tops",
-    slug: "tops",
-    keywords: ["tee", "polo", "shirt", "hoodie", "crewneck", "sweatshirt"],
-    image: "https://images.unsplash.com/photo-1512327536842-5aa37d1ba3e3?auto=format&fit=crop&w=600&q=80",
-  },
-  {
-    label: "Bottoms",
-    slug: "bottoms",
-    keywords: ["pant", "short", "trouser"],
-    image: "https://images.unsplash.com/photo-1542574621-e088a4464cc6?auto=format&fit=crop&w=600&q=80",
-  },
-  {
-    label: "Outerwear",
-    slug: "outerwear",
-    keywords: ["jacket", "overshirt"],
-    image: "https://images.unsplash.com/photo-1544441893-675973e31985?auto=format&fit=crop&w=600&q=80",
-  },
+  { label: "Tops", slug: "tops", keywords: ["tee", "polo", "shirt", "hoodie", "crewneck", "sweatshirt"] },
+  { label: "Bottoms", slug: "bottoms", keywords: ["pant", "short", "trouser"] },
+  { label: "Outerwear", slug: "outerwear", keywords: ["jacket", "overshirt"] },
 ];
 
 export default async function MenPage() {
@@ -50,6 +36,7 @@ export default async function MenPage() {
       badge: p.badge,
       image: p.colors?.[0]?.image ?? p.images[0],
       colors: p.colors,
+      sizes: p.sizes,
       isComingSoon: p.isComingSoon,
     }));
 
@@ -95,7 +82,7 @@ export default async function MenPage() {
       </section>
 
       {/* ── Interactive grid + category tiles ── */}
-      <Suspense>
+      <Suspense fallback={<ProductGridSkeleton />}>
         <CategoryShell products={products} tiles={TILES} />
       </Suspense>
 

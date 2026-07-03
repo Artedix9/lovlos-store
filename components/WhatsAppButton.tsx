@@ -10,11 +10,11 @@ export default function WhatsAppButton() {
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Chat with LOVLOS on WhatsApp"
-      className="fixed bottom-6 right-6 z-[200] flex items-center justify-center w-13 h-13 w-[52px] h-[52px] bg-primary text-white hover:bg-charcoal transition-colors duration-200 shadow-level-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      className="fixed bottom-6 right-6 z-[200] flex items-center justify-center w-[52px] h-[52px] bg-primary text-white hover:bg-charcoal transition-colors duration-200 shadow-level-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
     >
-      {/* Pulse ring */}
+      {/* Pulse ring — hidden entirely when the user prefers reduced motion */}
       <span
-        className="absolute inset-0 bg-primary opacity-30 animate-ping"
+        className="absolute inset-0 bg-primary opacity-30 motion-safe:animate-ping motion-reduce:hidden"
         aria-hidden="true"
       />
       {/* WhatsApp icon */}

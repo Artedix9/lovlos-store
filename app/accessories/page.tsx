@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import CategoryShell from "@/components/CategoryShell";
 import type { CategoryTile } from "@/components/CategoryShell";
+import ProductGridSkeleton from "@/components/ProductGridSkeleton";
 import { getProducts } from "@/lib/data";
 import { getHeroImages } from "@/lib/hero";
 import type { Product } from "@/components/ProductCard";
@@ -17,9 +18,9 @@ export const metadata: Metadata = {
 };
 
 const TILES: CategoryTile[] = [
-  { label: "Bags", slug: "bags", keywords: ["bag", "tote", "crossbody"], gradient: "from-[#e0d7d1] to-[#c8bfb9]", overlayClass: "bg-primary/0 group-hover:bg-primary/10" },
-  { label: "Hats & Caps", slug: "hats", keywords: ["hat", "cap", "beanie"], gradient: "from-[#ddd9d4] to-[#c5c1bc]", overlayClass: "bg-primary/0 group-hover:bg-primary/10" },
-  { label: "Lifestyle", slug: "lifestyle", keywords: ["sock", "belt", "watch"], gradient: "from-[#ceb18f] to-[#b89878]", overlayClass: "bg-primary/0 group-hover:bg-primary/10" },
+  { label: "Bags", slug: "bags", keywords: ["bag", "tote", "crossbody"] },
+  { label: "Hats & Caps", slug: "hats", keywords: ["hat", "cap", "beanie"] },
+  { label: "Lifestyle", slug: "lifestyle", keywords: ["sock", "belt", "watch"] },
 ];
 
 export default async function AccessoriesPage() {
@@ -35,6 +36,7 @@ export default async function AccessoriesPage() {
       badge: p.badge,
       image: p.colors?.[0]?.image ?? p.images[0],
       colors: p.colors,
+      sizes: p.sizes,
       isComingSoon: p.isComingSoon,
     }));
 
@@ -80,7 +82,7 @@ export default async function AccessoriesPage() {
       </section>
 
       {/* ── Interactive grid + category tiles ── */}
-      <Suspense>
+      <Suspense fallback={<ProductGridSkeleton />}>
         <CategoryShell products={products} tiles={TILES} />
       </Suspense>
 

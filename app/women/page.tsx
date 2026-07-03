@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import CategoryShell from "@/components/CategoryShell";
 import type { CategoryTile } from "@/components/CategoryShell";
+import ProductGridSkeleton from "@/components/ProductGridSkeleton";
 import { getProducts } from "@/lib/data";
 import { getHeroImages } from "@/lib/hero";
 import type { Product } from "@/components/ProductCard";
@@ -17,26 +18,9 @@ export const metadata: Metadata = {
 };
 
 const TILES: CategoryTile[] = [
-  {
-    label: "Tops",
-    slug: "tops",
-    keywords: ["top", "vest", "bra"],
-    image: "https://images.unsplash.com/photo-1554412933-514a83d2f3c8?auto=format&fit=crop&w=600&q=80",
-  },
-  {
-    label: "Bottoms",
-    slug: "bottoms",
-    keywords: ["trouser", "skirt", "legging", "short"],
-    image: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=600&q=80",
-    overlayClass: "bg-primary/15 group-hover:bg-primary/30",
-  },
-  {
-    label: "Outerwear",
-    slug: "outerwear",
-    keywords: ["jacket", "coat", "outerwear"],
-    image: "https://images.unsplash.com/photo-1551698618-1dfe5d97d256?auto=format&fit=crop&w=600&q=80",
-    overlayClass: "bg-primary/15 group-hover:bg-primary/30",
-  },
+  { label: "Tops", slug: "tops", keywords: ["top", "vest", "bra"] },
+  { label: "Bottoms", slug: "bottoms", keywords: ["trouser", "skirt", "legging", "short"] },
+  { label: "Outerwear", slug: "outerwear", keywords: ["jacket", "coat", "outerwear"] },
 ];
 
 export default async function WomenPage() {
@@ -52,6 +36,7 @@ export default async function WomenPage() {
       badge: p.badge,
       image: p.colors?.[0]?.image ?? p.images[0],
       colors: p.colors,
+      sizes: p.sizes,
       isComingSoon: p.isComingSoon,
     }));
 
@@ -101,7 +86,7 @@ export default async function WomenPage() {
       </section>
 
       {/* ── Interactive grid + category tiles ── */}
-      <Suspense>
+      <Suspense fallback={<ProductGridSkeleton />}>
         <CategoryShell products={products} tiles={TILES} />
       </Suspense>
 

@@ -20,10 +20,22 @@ const config: Config = {
         sand: "#e0d7d1",
         "highlight-light": "#f1e8dd",
         "highlight-medium": "#ceb18f",
+        success: "#4a6741",
+        "success-deep": "#3c4b37",
+        "success-tint": "#d8e1d5",
+        error: "#b42318",
+        "error-tint": "#fbeeec",
+        surface: "#fafafa",
       },
       fontFamily: {
         sans: ["var(--font-inter)", "Helvetica", "sans-serif"],
         display: ["var(--font-cormorant)", "Georgia", "serif"],
+      },
+      fontSize: {
+        /* Fluid display sizes — scale smoothly from 320px to 4K */
+        "display-lg": ["clamp(2rem, 4vw + 0.5rem, 3.5rem)", { lineHeight: "1.1" }],
+        "display-xl": ["clamp(2.5rem, 7vw, 7rem)", { lineHeight: "0.95" }],
+        "display-2xl": ["clamp(1.75rem, 9.2vw, 10rem)", { lineHeight: "0.92" }],
       },
       letterSpacing: {
         widest: "0.2em",

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(git -C /Users/mac/Documents/EdMotion/Development/LLWebsite status)",
+      "Bash(git -C /Users/mac/Documents/EdMotion/Development/LLWebsite diff --stat)",
+      "Bash(git -C /Users/mac/Documents/EdMotion/Development/LLWebsite log --oneline -3)",
+      "Bash(git -C /Users/mac/Documents/EdMotion/Development/LLWebsite add app/accessories/page.tsx app/api/admin/products/route.ts app/men/page.tsx app/product/[id]/ProductPageClient.tsx app/women/page.tsx components/CategoryShell.tsx components/Header.tsx components/Hero.tsx components/ProductCard.tsx context/ToastContext.tsx lib/data.ts lib/products.ts lib/supabase.ts)",
+      "Bash(git -C /Users/mac/Documents/EdMotion/Development/LLWebsite commit -m ' *)",
+      "Bash(git -C /Users/mac/Documents/EdMotion/Development/LLWebsite add app/accessories/page.tsx app/api/admin/products/route.ts app/men/page.tsx \"app/product/[id]/ProductPageClient.tsx\" app/women/page.tsx components/CategoryShell.tsx components/Header.tsx components/Hero.tsx components/ProductCard.tsx context/ToastContext.tsx lib/data.ts lib/products.ts lib/supabase.ts)",
+      "Bash(git -C /Users/mac/Documents/EdMotion/Development/LLWebsite push origin main)",
+      "Bash(gh run *)",
+      "Bash(npx next *)"
+    ]
+  }
+}

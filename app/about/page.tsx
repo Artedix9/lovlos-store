@@ -17,26 +17,23 @@ export default function AboutPage() {
       <main id="main-content">
 
       {/* ── Hero — full viewport, centred ── */}
-      <section className="w-full h-screen bg-zinc-950 flex flex-col items-center justify-center px-8 overflow-hidden gap-8 md:gap-10">
+      <section className="w-full h-screen bg-primary flex flex-col items-center justify-center px-8 overflow-hidden gap-8 md:gap-10">
 
         {/* Eyebrow */}
-        <p className="text-[10px] tracking-ultra uppercase text-zinc-500 font-sans">
+        <p className="text-[10px] tracking-ultra uppercase text-white/60 font-sans">
           Spring / Summer 2025
         </p>
 
-        {/* Headline */}
-        <h1
-          className="font-display font-black uppercase text-white leading-[0.88] tracking-tighter whitespace-nowrap"
-          style={{ fontSize: "clamp(2.5rem, 9.2vw, 10rem)" }}
-        >
+        {/* Headline — fluid from 320px up; min size keeps the nowrap line inside narrow viewports */}
+        <h1 className="font-display font-black uppercase text-white text-display-2xl tracking-tighter whitespace-nowrap">
           Good Vibes Defined.
         </h1>
 
         {/* Divider */}
-        <div className="w-12 h-px bg-zinc-600" />
+        <div className="w-12 h-px bg-white/30" aria-hidden="true" />
 
         {/* Philosophy */}
-        <p className="text-sm md:text-base font-sans font-light text-zinc-400 tracking-widest text-center leading-relaxed max-w-3xl uppercase">
+        <p className="text-sm md:text-base font-sans font-light text-white/70 tracking-widest text-center leading-relaxed max-w-3xl uppercase">
           LOVLOS was created for those who move with intention. We believe that
           true style isn&apos;t about fitting in — it&apos;s about the confidence
           to accept who you are and the boldness to show it to the world.
@@ -65,10 +62,7 @@ export default function AboutPage() {
               Our Story
             </p>
 
-            <h2
-              className="font-display font-black uppercase text-primary leading-tight tracking-tight"
-              style={{ fontSize: "clamp(2rem, 4vw, 3.5rem)" }}
-            >
+            <h2 className="font-display font-black uppercase text-primary text-display-lg tracking-tight">
               Born in Tanzania.<br />Built for the world.
             </h2>
 
@@ -99,10 +93,7 @@ export default function AboutPage() {
         <p className="text-xs tracking-ultra uppercase text-chicago font-sans">
           The Collection
         </p>
-        <h2
-          className="font-display font-black uppercase text-primary leading-[0.88] tracking-tight"
-          style={{ fontSize: "clamp(3rem, 8vw, 7rem)" }}
-        >
+        <h2 className="font-display font-black uppercase text-primary text-display-xl tracking-tight">
           Join the movement.
         </h2>
         <p className="text-sm font-sans font-light text-mine tracking-wide leading-relaxed max-w-xs">
@@ -111,7 +102,7 @@ export default function AboutPage() {
         </p>
         <Link
           href="/women"
-          className="bg-zinc-950 text-white text-xs tracking-widest uppercase px-12 py-4 hover:bg-zinc-800 transition-colors duration-200"
+          className="bg-primary text-white text-xs tracking-widest uppercase px-12 py-4 hover:bg-charcoal transition-colors duration-200"
         >
           Shop the Collection
         </Link>

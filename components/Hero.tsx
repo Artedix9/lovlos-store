@@ -3,12 +3,23 @@ import Link from "next/link";
 interface HeroProps {
   desktopSrc: string;
   mobileSrc: string;
+  /** Fills the viewport below the announcement bar + header */
   isFullScreen?: boolean;
   darkBackground?: boolean;
+  alt?: string;
 }
 
-export default function Hero({ desktopSrc, mobileSrc, isFullScreen = false, darkBackground = false }: HeroProps) {
-  const heightCls = isFullScreen ? "min-h-[75vh] md:h-[75vh]" : "min-h-[80vh] md:h-[80vh]";
+export default function Hero({
+  desktopSrc,
+  mobileSrc,
+  isFullScreen = false,
+  darkBackground = false,
+  alt = "LOVLOS — New Season Arrivals",
+}: HeroProps) {
+  /* svh keeps the hero stable on mobile browsers with collapsing URL bars */
+  const heightCls = isFullScreen
+    ? "min-h-[calc(100svh-var(--announce-h)-var(--header-h))]"
+    : "min-h-[80vh] md:h-[80vh]";
 
   return (
     <section className="relative w-full overflow-hidden bg-smoke">
@@ -20,13 +31,21 @@ export default function Hero({ desktopSrc, mobileSrc, isFullScreen = false, dark
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={mobileSrc}
-            alt="LOVLOS — New Season Arrivals"
+            alt={alt}
             fetchPriority="high"
             decoding="async"
             className="absolute inset-0 w-full h-full object-cover object-center"
           />
         </picture>
       </div>
+
+      {/* Legibility scrim — keeps white copy readable regardless of the uploaded image */}
+      {darkBackground && (
+        <div
+          className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-transparent"
+          aria-hidden="true"
+        />
+      )}
 
       {/* Content overlay */}
       <div className="absolute inset-0 flex flex-col justify-end pb-10 md:pb-16 px-5 md:px-16 lg:px-24">
@@ -58,7 +77,7 @@ export default function Hero({ desktopSrc, mobileSrc, isFullScreen = false, dark
               Shop Men
             </Link>
           </div>
-          <p className={`mt-6 text-xs tracking-widest uppercase ${darkBackground ? "text-white/70" : "text-chicago"}`}>
+          <p className={`mt-6 text-xs tracking-widest uppercase ${darkBackground ? "text-white/80" : "text-chicago"}`}>
             Prices shown in TZS
           </p>
         </div>
@@ -66,9 +85,9 @@ export default function Hero({ desktopSrc, mobileSrc, isFullScreen = false, dark
 
       {/* Scroll indicator — centered, only shown on full-screen */}
       {isFullScreen && (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden md:flex flex-col items-center gap-2">
           <p className={`text-[9px] tracking-[0.3em] uppercase font-sans ${darkBackground ? "text-white" : "text-chicago"}`}>Scroll</p>
-          <div className={`w-px h-8 animate-pulse ${darkBackground ? "bg-white" : "bg-dawn"}`} aria-hidden="true" />
+          <div className={`w-px h-8 motion-safe:animate-pulse ${darkBackground ? "bg-white" : "bg-dawn"}`} aria-hidden="true" />
         </div>
       )}
     </section>
