@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/context/ToastContext";
 import { formatTZS } from "@/lib/products";
+import WishlistButton from "@/components/WishlistButton";
 
 export interface ProductColor {
   name: string;
@@ -22,6 +23,7 @@ export interface Product {
   image?: string;
   gradient?: string;
   colors?: ProductColor[];
+  sizes?: string[];
   isComingSoon?: boolean;
 }
 
@@ -40,7 +42,8 @@ export default function ProductCard({
 }) {
   const { addItem } = useCart();
   const { showToast } = useToast();
-  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const comingSoon = product.isComingSoon ?? false;
 
   const [selectedColor, setSelectedColor] = useState<ProductColor | null>(
@@ -49,16 +52,15 @@ export default function ProductCard({
 
   const imageSrc = selectedColor?.image ?? product.image;
 
-  function handleQuickAdd(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (adding || comingSoon) return;
+  /* Single-size products add instantly; sized products open a size picker
+     so the customer always chooses — never a silent default. */
+  const isOneSize = !product.sizes || product.sizes.length <= 1;
 
-    setAdding(true);
+  function quickAdd(size: string) {
     addItem({
       id: product.id,
       name: product.name,
-      size: "M",
+      size,
       color: selectedColor?.name,
       price: product.price,
       image: imageSrc ?? "",
@@ -66,7 +68,20 @@ export default function ProductCard({
     showToast(
       `${product.name}${selectedColor ? ` — ${selectedColor.name}` : ""} added to bag.`
     );
-    setTimeout(() => setAdding(false), 1200);
+    setPickerOpen(false);
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1200);
+  }
+
+  function handleQuickAdd(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (added || comingSoon) return;
+    if (isOneSize) {
+      quickAdd("One Size");
+    } else {
+      setPickerOpen((v) => !v);
+    }
   }
 
   const imageArea = (
@@ -104,6 +119,18 @@ export default function ProductCard({
         </div>
       )}
 
+      {/* Wishlist heart */}
+      {!comingSoon && !cardLabel && (
+        <WishlistButton
+          item={{
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            image: imageSrc ?? "",
+          }}
+        />
+      )}
+
       {/* Badge */}
       {product.badge && !comingSoon && !cardLabel && (
         <span className="absolute top-3 left-3 bg-primary text-white text-[9px] tracking-widest uppercase px-2 py-1 z-10 font-bold">
@@ -117,33 +144,81 @@ export default function ProductCard({
           className={[
             "absolute bottom-0 left-0 right-0 z-10",
             "transition-transform duration-300 ease-out",
-            /* hover devices: hidden until hover; touch devices: always visible */
-            "[@media(hover:hover)]:translate-y-full",
+            /* hover devices: hidden until hover (unless the picker is open);
+               touch devices: always visible */
+            pickerOpen ? "" : "[@media(hover:hover)]:translate-y-full",
             "[@media(hover:hover)]:group-hover:translate-y-0",
           ].join(" ")}
         >
-          <button
-            onClick={handleQuickAdd}
-            disabled={adding}
-            aria-label={`Quick add ${product.name} to bag`}
-            className={[
-              "w-full bg-primary text-white text-[10px] tracking-widest uppercase py-3.5 transition-all duration-200",
-              adding ? "opacity-50 cursor-default" : "hover:bg-charcoal",
-            ].join(" ")}
-          >
-            {adding ? "Adding…" : "Quick Add"}
-          </button>
+          {pickerOpen && !isOneSize ? (
+            /* Size picker — tap a size to add it */
+            <div
+              className="bg-primary px-2 pt-2.5 pb-2"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+              onKeyDown={(e) => { if (e.key === "Escape") setPickerOpen(false); }}
+            >
+              <div className="flex items-center justify-between px-1 mb-2">
+                <p className="text-[9px] tracking-widest uppercase text-white/60">
+                  Select Size
+                </p>
+                <button
+                  onClick={() => setPickerOpen(false)}
+                  aria-label="Close size picker"
+                  className="text-white/60 hover:text-white transition-colors duration-150 p-1 -m-1 leading-none"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+                    strokeLinejoin="round" aria-hidden="true">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+              <div className="flex gap-1" role="group" aria-label={`Select size for ${product.name}`}>
+                {product.sizes!.map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => quickAdd(size)}
+                    aria-label={`Add ${product.name} to bag, size ${size}`}
+                    className="flex-1 min-w-0 h-9 text-[10px] tracking-wider uppercase text-white border border-white/25 hover:bg-white hover:text-primary focus-visible:bg-white focus-visible:text-primary focus-visible:outline-none transition-colors duration-150"
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={handleQuickAdd}
+              disabled={added}
+              aria-expanded={isOneSize ? undefined : pickerOpen}
+              aria-label={
+                isOneSize
+                  ? `Quick add ${product.name} to bag`
+                  : `Quick add ${product.name} to bag — choose a size`
+              }
+              className={[
+                "w-full bg-primary text-white text-[10px] tracking-widest uppercase py-3.5 transition-all duration-200",
+                added ? "cursor-default" : "hover:bg-charcoal",
+              ].join(" ")}
+            >
+              {added ? "Added to Bag ✓" : "Quick Add"}
+            </button>
+          )}
         </div>
       )}
     </div>
   );
 
   return (
-    <article className="group flex flex-col">
+    <article
+      className="group flex flex-col"
+      onMouseLeave={() => setPickerOpen(false)}
+    >
       {comingSoon ? (
         <div className="cursor-default">{imageArea}</div>
       ) : (
-        <Link href={product.href} tabIndex={0}>{imageArea}</Link>
+        <Link href={product.href}>{imageArea}</Link>
       )}
 
       {cardLabel ? (
@@ -168,23 +243,29 @@ export default function ProductCard({
 
           {/* Color swatches */}
           {!comingSoon && product.colors && product.colors.length > 1 && (
-            <div className="flex gap-1.5 mt-1" role="group" aria-label="Colour options">
+            <div className="flex gap-1 mt-1" role="group" aria-label="Colour options">
               {product.colors.map((color) => (
+                /* Outer button provides a ≥24px hit area (WCAG 2.5.8);
+                   the inner dot keeps the compact visual. */
                 <button
                   key={color.name}
                   title={color.name}
                   onClick={(e) => { e.preventDefault(); setSelectedColor(color); }}
                   aria-label={`${color.name}${selectedColor?.name === color.name ? " (selected)" : ""}`}
                   aria-pressed={selectedColor?.name === color.name}
-                  className={[
-                    "w-4 h-4 rounded-full border transition-all duration-150",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary",
-                    selectedColor?.name === color.name
-                      ? "ring-1 ring-offset-1 ring-primary border-transparent"
-                      : "border-transparent hover:ring-1 hover:ring-offset-1 hover:ring-chicago",
-                  ].join(" ")}
-                  style={{ backgroundColor: color.hex }}
-                />
+                  className="w-6 h-6 flex items-center justify-center group/swatch focus-visible:outline-none"
+                >
+                  <span
+                    className={[
+                      "w-4 h-4 rounded-full transition-all duration-150",
+                      selectedColor?.name === color.name
+                        ? "ring-1 ring-offset-1 ring-primary"
+                        : "group-hover/swatch:ring-1 group-hover/swatch:ring-offset-1 group-hover/swatch:ring-chicago group-focus-visible/swatch:ring-2 group-focus-visible/swatch:ring-offset-1 group-focus-visible/swatch:ring-primary",
+                    ].join(" ")}
+                    style={{ backgroundColor: color.hex }}
+                    aria-hidden="true"
+                  />
+                </button>
               ))}
             </div>
           )}

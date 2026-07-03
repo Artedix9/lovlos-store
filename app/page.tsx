@@ -6,6 +6,7 @@ import Hero from "@/components/Hero";
 import Footer from "@/components/Footer";
 import ProductCard from "@/components/ProductCard";
 import type { Product } from "@/components/ProductCard";
+import RecentlyViewed from "@/components/RecentlyViewed";
 
 export const revalidate = 3600;
 
@@ -20,6 +21,7 @@ function toCard(p: PDPProduct): Product {
     badge: p.badge,
     image: p.colors?.[0]?.image ?? p.images[0],
     colors: p.colors,
+    sizes: p.sizes,
     isComingSoon: p.isComingSoon,
   };
 }
@@ -71,7 +73,7 @@ export default async function Home() {
 
       {trending.length > 0 && (
         <section className="bg-white pt-16 md:pt-20 pb-24 px-5 md:px-16 lg:px-24">
-          <h2 className="text-2xl font-extrabold uppercase tracking-wide text-center text-primary mb-12">
+          <h2 className="heading-section text-center mb-12">
             Trending Now
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-10">
@@ -86,6 +88,8 @@ export default async function Home() {
           </div>
         </section>
       )}
+
+      <RecentlyViewed />
 
       <Footer />
     </main>

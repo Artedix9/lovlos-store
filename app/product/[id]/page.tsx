@@ -3,7 +3,23 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { getProducts } from "@/lib/data";
+import type { PDPProduct } from "@/lib/products";
+import type { Product } from "@/components/ProductCard";
 import ProductPageClient from "./ProductPageClient";
+
+function toCard(p: PDPProduct): Product {
+  return {
+    id: p.id,
+    name: p.name,
+    price: p.price,
+    href: `/product/${p.id}`,
+    badge: p.badge,
+    image: p.colors?.[0]?.image ?? p.images[0],
+    colors: p.colors,
+    sizes: p.sizes,
+    isComingSoon: p.isComingSoon,
+  };
+}
 
 export const revalidate = 3600;
 
@@ -52,5 +68,14 @@ export default async function ProductPage(
     );
   }
 
-  return <ProductPageClient product={product} />;
+  /* Related: same category first, then the rest of the catalog, max 4 */
+  const pool = products.filter((p) => p.id !== product.id && !p.isComingSoon);
+  const related = [
+    ...pool.filter((p) => p.category === product.category),
+    ...pool.filter((p) => p.category !== product.category),
+  ]
+    .slice(0, 4)
+    .map(toCard);
+
+  return <ProductPageClient product={product} related={related} />;
 }

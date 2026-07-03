@@ -9,6 +9,12 @@ import Footer from "@/components/Footer";
 import { formatTZS, type PDPProduct, type ProductColor } from "@/lib/products";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/context/ToastContext";
+import { useFocusTrap } from "@/lib/useFocusTrap";
+import SizeGuideModal from "@/components/SizeGuideModal";
+import ProductCard, { type Product } from "@/components/ProductCard";
+import RecentlyViewed from "@/components/RecentlyViewed";
+import WishlistButton from "@/components/WishlistButton";
+import { recordRecentlyViewed } from "@/lib/recentlyViewed";
 
 /* ── Accordion — CSS Grid rows animation (no arbitrary maxHeight) ── */
 function AccordionItem({
@@ -64,13 +70,8 @@ function Lightbox({
   alt: string;
   onClose: () => void;
 }) {
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  /* Traps Tab on the close button, closes on Escape, restores focus on exit */
+  const trapRef = useFocusTrap<HTMLDivElement>(true, onClose);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -79,6 +80,7 @@ function Lightbox({
 
   return (
     <motion.div
+      ref={trapRef}
       key="lightbox-backdrop"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -125,13 +127,20 @@ function Lightbox({
 }
 
 /* ── Main interactive PDP ── */
-export default function ProductPageClient({ product }: { product: PDPProduct }) {
+export default function ProductPageClient({
+  product,
+  related = [],
+}: {
+  product: PDPProduct;
+  related?: Product[];
+}) {
   const { addItem, openCart } = useCart();
   const { showToast } = useToast();
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [sizeError, setSizeError] = useState(false);
   const [added, setAdded] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
   const [selectedColor, setSelectedColor] = useState<ProductColor | null>(
     product.colors?.[0] ?? null
   );
@@ -139,6 +148,16 @@ export default function ProductPageClient({ product }: { product: PDPProduct }) 
   const carouselRef = useRef<HTMLDivElement>(null);
 
   const heroImage = selectedColor?.image ?? product.images[0] ?? "";
+
+  /* Log this product for the "Recently Viewed" strip */
+  useEffect(() => {
+    recordRecentlyViewed({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      image: product.colors?.[0]?.image ?? product.images[0] ?? "",
+    });
+  }, [product]);
 
   const sortedImages = useMemo(
     () => [heroImage, ...product.images.filter((src) => src !== heroImage)],
@@ -197,7 +216,8 @@ export default function ProductPageClient({ product }: { product: PDPProduct }) 
       <Header />
 
       <main id="main-content">
-        <div className="lg:grid lg:grid-cols-2 lg:min-h-screen">
+        {/* max-w cap keeps product imagery sane on ultra-wide monitors */}
+        <div className="mx-auto max-w-screen-2xl lg:grid lg:grid-cols-2 lg:min-h-screen">
 
           {/* ══ LEFT — Images ══ */}
           <div>
@@ -242,18 +262,24 @@ export default function ProductPageClient({ product }: { product: PDPProduct }) 
             {sortedImages.length > 1 && (
               <div className="lg:hidden flex justify-center items-center gap-2 py-4" aria-label="Image navigation">
                 {sortedImages.map((_, i) => (
+                  /* 32px hit area around a small visual dot (WCAG 2.5.8) */
                   <button
                     key={i}
                     onClick={() => scrollToSlide(i)}
                     aria-label={`Go to image ${i + 1}`}
                     aria-current={i === activeSlide ? "true" : undefined}
-                    className={[
-                      "rounded-full transition-all duration-200",
-                      i === activeSlide
-                        ? "w-4 h-1.5 bg-primary"
-                        : "w-1.5 h-1.5 bg-mercury hover:bg-chicago",
-                    ].join(" ")}
-                  />
+                    className="w-8 h-8 flex items-center justify-center"
+                  >
+                    <span
+                      className={[
+                        "rounded-full transition-all duration-200",
+                        i === activeSlide
+                          ? "w-4 h-1.5 bg-primary"
+                          : "w-1.5 h-1.5 bg-alto",
+                      ].join(" ")}
+                      aria-hidden="true"
+                    />
+                  </button>
                 ))}
               </div>
             )}
@@ -376,7 +402,10 @@ export default function ProductPageClient({ product }: { product: PDPProduct }) 
                         </span>
                       )}
                     </p>
-                    <button className="text-[11px] tracking-widest uppercase text-chicago underline underline-offset-2 hover:text-primary transition-colors duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:ring-offset-1">
+                    <button
+                      onClick={() => setSizeGuideOpen(true)}
+                      className="text-[11px] tracking-widest uppercase text-chicago underline underline-offset-2 hover:text-primary transition-colors duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:ring-offset-1"
+                    >
                       Size Guide
                     </button>
                   </div>
@@ -407,35 +436,46 @@ export default function ProductPageClient({ product }: { product: PDPProduct }) 
                   </div>
 
                   {sizeError && (
-                    <p role="alert" className="mt-2 text-xs text-red-600 tracking-wide">
+                    <p role="alert" className="mt-2 text-xs text-error tracking-wide">
                       Please select a size to continue.
                     </p>
                   )}
                 </div>
               )}
 
-              {/* Add to Bag */}
-              {product.isComingSoon ? (
-                <button
-                  disabled
-                  className="w-full py-4 text-xs tracking-[0.2em] uppercase bg-smoke text-chicago border border-mercury cursor-not-allowed"
-                >
-                  Coming Soon
-                </button>
-              ) : (
-                <button
-                  onClick={handleAddToBag}
-                  className={[
-                    "w-full py-4 text-xs tracking-widest uppercase transition-all duration-200",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
-                    added
-                      ? "bg-[#4a6741] text-white"
-                      : "bg-primary text-white hover:bg-charcoal",
-                  ].join(" ")}
-                >
-                  {added ? "Added to Bag ✓" : "Add to Bag"}
-                </button>
-              )}
+              {/* Add to Bag + wishlist */}
+              <div className="flex items-stretch gap-2">
+                {product.isComingSoon ? (
+                  <button
+                    disabled
+                    className="flex-1 py-4 text-xs tracking-[0.2em] uppercase bg-smoke text-chicago border border-mercury cursor-not-allowed"
+                  >
+                    Coming Soon
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleAddToBag}
+                    className={[
+                      "flex-1 py-4 text-xs tracking-widest uppercase transition-all duration-200",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+                      added
+                        ? "bg-success text-white"
+                        : "bg-primary text-white hover:bg-charcoal",
+                    ].join(" ")}
+                  >
+                    {added ? "Added to Bag ✓" : "Add to Bag"}
+                  </button>
+                )}
+                <WishlistButton
+                  variant="pdp"
+                  item={{
+                    id: product.id,
+                    name: product.name,
+                    price: product.price,
+                    image: product.colors?.[0]?.image ?? product.images[0] ?? "",
+                  }}
+                />
+              </div>
 
               <p className="mt-3 text-center text-[11px] tracking-widest uppercase text-chicago">
                 Free delivery on orders above TZS 150,000
@@ -472,6 +512,24 @@ export default function ProductPageClient({ product }: { product: PDPProduct }) 
             </div>
           </div>
         </div>
+
+        {/* ── You May Also Like ── */}
+        {related.length > 0 && (
+          <section
+            aria-label="You may also like"
+            className="max-w-screen-2xl mx-auto px-6 md:px-10 lg:px-16 py-14 md:py-16 border-t border-mercury"
+          >
+            <h2 className="heading-section mb-8">You May Also Like</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-5">
+              {related.map((p) => (
+                <ProductCard key={p.id} product={p} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── Recently Viewed (excludes the product on screen) ── */}
+        <RecentlyViewed excludeId={product.id} />
       </main>
 
       <Footer />
@@ -482,6 +540,15 @@ export default function ProductPageClient({ product }: { product: PDPProduct }) 
             src={lightboxSrc}
             alt={product.name}
             onClose={() => setLightboxSrc(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {sizeGuideOpen && (
+          <SizeGuideModal
+            category={product.category}
+            onClose={() => setSizeGuideOpen(false)}
           />
         )}
       </AnimatePresence>
