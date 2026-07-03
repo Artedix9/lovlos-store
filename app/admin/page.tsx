@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { Fragment, useState, useEffect, useCallback, useRef } from "react";
 import type { PDPProduct } from "@/lib/products";
+import type { SavedOrder } from "@/lib/orders";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -15,6 +16,7 @@ interface FormState {
   name: string;
   category: string;
   price: string;
+  stock: string;
   badge: string;
   images: string[];
   hasColors: boolean;
@@ -29,6 +31,7 @@ const DEFAULT_FORM: FormState = {
   name: "",
   category: "Women",
   price: "",
+  stock: "",
   badge: "",
   images: [],
   hasColors: false,
@@ -41,6 +44,23 @@ const DEFAULT_FORM: FormState = {
 
 const CATEGORIES = ["Men", "Women", "Accessories"] as const;
 const ACCEPT = "image/jpeg,image/jpg,image/png,image/webp";
+
+const ORDER_STATUSES = ["pending", "confirmed", "dispatched", "delivered", "cancelled"] as const;
+
+/** Confirmed = payment screenshot received, so these count as paid revenue. */
+const PAID_STATUSES: ReadonlySet<SavedOrder["status"]> = new Set(["confirmed", "dispatched", "delivered"]);
+
+const STATUS_CLS: Record<SavedOrder["status"], string> = {
+  pending: "text-amber-400/80 border-amber-400/30",
+  confirmed: "text-sky-400/80 border-sky-400/30",
+  dispatched: "text-violet-400/80 border-violet-400/30",
+  delivered: "text-emerald-400/80 border-emerald-400/30",
+  cancelled: "text-red-400/60 border-red-400/25",
+};
+
+function formatOrderDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -435,19 +455,26 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
 
   // UI
-  const [activeTab, setActiveTab] = useState<"overview" | "inventory" | "hero">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "orders" | "inventory" | "hero">("overview");
   const [showModal, setShowModal] = useState(false);
 
   // Inventory filters
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState<"all" | "Men" | "Women" | "Accessories">("all");
-  const [filterStatus, setFilterStatus] = useState<"all" | "live" | "coming-soon">("all");
+  const [filterStatus, setFilterStatus] = useState<"all" | "live" | "coming-soon" | "out-of-stock">("all");
   const [filterBadge, setFilterBadge] = useState<"all" | "New" | "Best Seller" | "none">("all");
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
+
+  // Orders
+  const [orders, setOrders] = useState<SavedOrder[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState("");
+  const [statusSaving, setStatusSaving] = useState<string | null>(null);
+  const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
 
   // Hero images
   const [heroImages, setHeroImages] = useState<Record<string, { desktop_src: string; mobile_src: string }>>({});
@@ -469,6 +496,23 @@ export default function AdminPage() {
       if (res.ok) setHeroImages(await res.json());
     } catch { /* silent */ } finally {
       setHeroLoading(false);
+    }
+  }, []);
+
+  const fetchOrders = useCallback(async (key: string) => {
+    setOrdersLoading(true);
+    setOrdersError("");
+    try {
+      const res = await fetch("/api/admin/orders", { headers: { "x-admin-key": key } });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error ?? "");
+      }
+      setOrders(await res.json());
+    } catch (e) {
+      setOrdersError(e instanceof Error && e.message ? `Failed to load orders: ${e.message}` : "Failed to load orders.");
+    } finally {
+      setOrdersLoading(false);
     }
   }, []);
 
@@ -495,7 +539,8 @@ export default function AdminPage() {
       }
     });
     fetchHeroImages(adminKey);
-  }, [adminKey, fetchProducts, fetchHeroImages]);
+    fetchOrders(adminKey);
+  }, [adminKey, fetchProducts, fetchHeroImages, fetchOrders]);
 
   // ── Login ──────────────────────────────────────────────────────────────────
 
@@ -541,6 +586,7 @@ export default function AdminPage() {
       name: p.name,
       category: p.category,
       price: String(p.price),
+      stock: String(p.stock ?? 0),
       badge: p.badge ?? "",
       images: p.images ?? [],
       hasColors: (p.colors?.length ?? 0) > 0,
@@ -574,6 +620,7 @@ export default function AdminPage() {
       name: form.name,
       category: form.category,
       price: Number(form.price),
+      stock: Number(form.stock) || 0,
       badge: form.badge || undefined,
       images: form.images,
       colors: form.hasColors
@@ -591,7 +638,10 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("Save failed");
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error ?? "Save failed");
+      }
       const saved: PDPProduct = await res.json();
       if (editId) {
         setProducts((prev) => prev.map((p) => (p.id === editId ? saved : p)));
@@ -599,8 +649,8 @@ export default function AdminPage() {
         setProducts((prev) => [...prev, saved]);
       }
       closeModal();
-    } catch {
-      setActionError("Failed to save. Try again.");
+    } catch (e) {
+      setActionError(e instanceof Error && e.message !== "Save failed" ? `Failed to save: ${e.message}` : "Failed to save. Try again.");
     } finally {
       setSaving(false);
     }
@@ -618,12 +668,39 @@ export default function AdminPage() {
         method: "DELETE",
         headers: { "x-admin-key": adminKey },
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error ?? "");
+      }
       setProducts((prev) => prev.filter((p) => p.id !== id));
-    } catch {
-      setActionError("Delete failed. Try again.");
+    } catch (e) {
+      setActionError(e instanceof Error && e.message ? `Delete failed: ${e.message}` : "Delete failed. Try again.");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  // ── Order status update ────────────────────────────────────────────────────
+
+  const handleStatusChange = async (id: string, status: SavedOrder["status"]) => {
+    if (!adminKey) return;
+    setStatusSaving(id);
+    setOrdersError("");
+    try {
+      const res = await fetch("/api/admin/orders", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify({ id, status }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error ?? "");
+      }
+      setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
+    } catch (e) {
+      setOrdersError(e instanceof Error && e.message ? `Failed to update status: ${e.message}` : "Failed to update status. Try again.");
+    } finally {
+      setStatusSaving(null);
     }
   };
 
@@ -639,9 +716,12 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
         body: JSON.stringify({ page, ...heroImages[page] }),
       });
-      if (!res.ok) throw new Error();
-    } catch {
-      setHeroError("Failed to save. Try again.");
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error ?? "");
+      }
+    } catch (e) {
+      setHeroError(e instanceof Error && e.message ? `Failed to save: ${e.message}` : "Failed to save. Try again.");
     } finally {
       setHeroSaving(null);
     }
@@ -654,6 +734,7 @@ export default function AdminPage() {
     if (filterCategory !== "all" && p.category !== filterCategory) return false;
     if (filterStatus === "live" && p.isComingSoon) return false;
     if (filterStatus === "coming-soon" && !p.isComingSoon) return false;
+    if (filterStatus === "out-of-stock" && (p.stock ?? 0) > 0) return false;
     if (filterBadge === "none" && p.badge) return false;
     if (filterBadge !== "all" && filterBadge !== "none" && p.badge !== filterBadge) return false;
     return true;
@@ -664,7 +745,22 @@ export default function AdminPage() {
   const men = products.filter((p) => p.category === "Men").length;
   const women = products.filter((p) => p.category === "Women").length;
   const accessories = products.filter((p) => p.category === "Accessories").length;
-  const catalogueValue = products.reduce((sum, p) => sum + p.price, 0);
+  const unitsInStock = products.reduce((sum, p) => sum + (p.stock ?? 0), 0);
+  const stockValue = products.reduce((sum, p) => sum + (p.stock ?? 0) * p.price, 0);
+  const outOfStock = products.filter((p) => !p.isComingSoon && (p.stock ?? 0) === 0).length;
+  const lowStock = products.filter((p) => !p.isComingSoon && (p.stock ?? 0) > 0 && (p.stock ?? 0) <= 5).length;
+
+  const pendingOrders = orders.filter((o) => o.status === "pending").length;
+  const deliveredOrders = orders.filter((o) => o.status === "delivered").length;
+  const paidOrders = orders.filter((o) => PAID_STATUSES.has(o.status));
+  const revenue = paidOrders.reduce((sum, o) => sum + o.total, 0);
+  const now = new Date();
+  const monthRevenue = paidOrders
+    .filter((o) => {
+      const d = new Date(o.created_at);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    })
+    .reduce((sum, o) => sum + o.total, 0);
 
   // ── Login screen ───────────────────────────────────────────────────────────
 
@@ -715,7 +811,7 @@ export default function AdminPage() {
 
       <main className="px-6 md:px-10 py-8 max-w-7xl mx-auto">
         <nav className="flex gap-8 border-b border-white/[0.08] mb-10">
-          {(["overview", "inventory", "hero"] as const).map((tab) => (
+          {(["overview", "orders", "inventory", "hero"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -724,6 +820,9 @@ export default function AdminPage() {
               }`}
             >
               {tab === "hero" ? "Hero Images" : tab}
+              {tab === "orders" && pendingOrders > 0 && (
+                <span className="ml-1.5 text-[8px] text-amber-400/80 tabular-nums">{pendingOrders}</span>
+              )}
             </button>
           ))}
         </nav>
@@ -731,6 +830,20 @@ export default function AdminPage() {
         {/* ── Overview ──────────────────────────────────────────────────────── */}
         {activeTab === "overview" && (
           <section>
+            <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-6">Orders &amp; Revenue</p>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+              <StatCard label="Total Orders" value={orders.length} />
+              <StatCard label="Pending" value={pendingOrders} sub="Awaiting payment confirmation" />
+              <StatCard label="Delivered" value={deliveredOrders} />
+            </div>
+            <div className="border border-white/10 p-6 mb-10">
+              <p className="text-[9px] tracking-[0.3em] uppercase text-white/30 mb-3">Revenue</p>
+              <p className="text-4xl font-light">TZS {revenue.toLocaleString("en-TZ")}</p>
+              <p className="text-[10px] text-white/25 mt-1.5">
+                Confirmed, dispatched &amp; delivered orders · TZS {monthRevenue.toLocaleString("en-TZ")} this month
+              </p>
+            </div>
+
             <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-6">Inventory Overview</p>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
               <StatCard label="Total Products" value={products.length} />
@@ -738,11 +851,156 @@ export default function AdminPage() {
               <StatCard label="Women's Items" value={women} />
               <StatCard label="Accessories" value={accessories} />
             </div>
-            <div className="border border-white/10 p-6">
-              <p className="text-[9px] tracking-[0.3em] uppercase text-white/30 mb-3">Catalogue Value</p>
-              <p className="text-4xl font-light">TZS {catalogueValue.toLocaleString("en-TZ")}</p>
-              <p className="text-[10px] text-white/25 mt-1.5">Sum of all listed prices</p>
+
+            <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-6 mt-10">Stock &amp; Value</p>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+              <StatCard label="Units in Stock" value={unitsInStock.toLocaleString("en-TZ")} sub="Total units across all products" />
+              <StatCard label="Low Stock" value={lowStock} sub="Live products with 5 or fewer units" />
+              <StatCard label="Out of Stock" value={outOfStock} sub="Live products with zero units" />
             </div>
+            <div className="border border-white/10 p-6">
+              <p className="text-[9px] tracking-[0.3em] uppercase text-white/30 mb-3">Stock Value</p>
+              <p className="text-4xl font-light">TZS {stockValue.toLocaleString("en-TZ")}</p>
+              <p className="text-[10px] text-white/25 mt-1.5">Units in stock × price — revenue if everything on hand sells</p>
+            </div>
+          </section>
+        )}
+
+        {/* ── Orders ────────────────────────────────────────────────────────── */}
+        {activeTab === "orders" && (
+          <section>
+            <div className="flex items-center justify-between mb-6">
+              <p className="text-[9px] tracking-[0.3em] uppercase text-white/25">
+                {orders.length} {orders.length === 1 ? "Order" : "Orders"}
+                {pendingOrders > 0 && <span className="text-amber-400/60 ml-2">· {pendingOrders} pending</span>}
+              </p>
+              <button
+                onClick={() => adminKey && fetchOrders(adminKey)}
+                disabled={ordersLoading}
+                className="text-[9px] tracking-[0.25em] uppercase text-white/30 hover:text-white/60 transition-colors disabled:opacity-40"
+              >
+                Refresh
+              </button>
+            </div>
+
+            {ordersError && <p className="text-red-400/80 text-[10px] tracking-wider mb-4">{ordersError}</p>}
+
+            {ordersLoading ? (
+              <div className="border border-white/[0.08] py-24 text-center text-[9px] tracking-[0.3em] uppercase text-white/20">Loading...</div>
+            ) : (
+              <div className="border border-white/[0.08] overflow-x-auto">
+                <table className="w-full min-w-[820px]">
+                  <thead>
+                    <tr className="border-b border-white/[0.08]">
+                      {["Order", "Date", "Customer", "City", "Payment", "Total (TZS)", "Status"].map((h, i) => (
+                        <th key={i} className="text-left text-[9px] tracking-[0.25em] uppercase text-white/25 px-4 py-3 font-normal">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.map((o) => (
+                      <Fragment key={o.id}>
+                        <tr
+                          onClick={() => setExpandedOrder(expandedOrder === o.id ? null : o.id)}
+                          className="border-b border-white/[0.04] hover:bg-white/[0.015] transition-colors cursor-pointer"
+                        >
+                          <td className="px-4 py-3">
+                            <span className="text-xs font-mono text-white">{o.id}</span>
+                            <span className={`ml-2 inline-block text-white/25 text-[9px] transition-transform ${expandedOrder === o.id ? "rotate-90" : ""}`}>▸</span>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-white/50 whitespace-nowrap">{formatOrderDate(o.created_at)}</td>
+                          <td className="px-4 py-3">
+                            <p className="text-xs text-white/80">{o.customer_name}</p>
+                            <p className="text-[10px] text-white/30 mt-0.5">{o.phone}</p>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-white/50">{o.city}</td>
+                          <td className="px-4 py-3 text-xs text-white/50 whitespace-nowrap">
+                            {o.payment_method === "mobile-money" ? "Mobile Money" : "Cash on Delivery"}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-white/80 tabular-nums">{o.total.toLocaleString("en-TZ")}</td>
+                          <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                            <select
+                              value={o.status}
+                              disabled={statusSaving === o.id}
+                              onChange={(e) => handleStatusChange(o.id, e.target.value as SavedOrder["status"])}
+                              className={`bg-[#111] border text-[9px] tracking-[0.15em] uppercase px-2 py-1.5 focus:outline-none transition-colors disabled:opacity-40 cursor-pointer ${STATUS_CLS[o.status]}`}
+                            >
+                              {ORDER_STATUSES.map((s) => (
+                                <option key={s} value={s} className="text-white bg-[#111]">{s}</option>
+                              ))}
+                            </select>
+                          </td>
+                        </tr>
+                        {expandedOrder === o.id && (
+                          <tr className="border-b border-white/[0.04] bg-white/[0.01]">
+                            <td colSpan={7} className="px-4 py-4">
+                              <div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-6">
+                                {/* Items */}
+                                <div>
+                                  <p className="text-[8px] tracking-[0.25em] uppercase text-white/25 mb-2">Items</p>
+                                  <div className="space-y-1.5">
+                                    {o.items.map((item, i) => (
+                                      <div key={i} className="flex items-baseline justify-between gap-4 text-xs">
+                                        <span className="text-white/70">
+                                          {item.name}
+                                          <span className="text-white/30 ml-2">
+                                            {[item.color, item.size].filter(Boolean).join(" · ")} × {item.quantity}
+                                          </span>
+                                        </span>
+                                        <span className="text-white/50 tabular-nums whitespace-nowrap">
+                                          {(item.price * item.quantity).toLocaleString("en-TZ")}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className="border-t border-white/[0.06] mt-3 pt-2 space-y-1 text-[11px]">
+                                    <div className="flex justify-between text-white/40">
+                                      <span>Subtotal</span><span className="tabular-nums">{o.subtotal.toLocaleString("en-TZ")}</span>
+                                    </div>
+                                    <div className="flex justify-between text-white/40">
+                                      <span>Delivery</span><span className="tabular-nums">{o.delivery_fee.toLocaleString("en-TZ")}</span>
+                                    </div>
+                                    <div className="flex justify-between text-white/80">
+                                      <span>Total</span><span className="tabular-nums">{o.total.toLocaleString("en-TZ")}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                {/* Contact / delivery */}
+                                <div className="space-y-3">
+                                  <div>
+                                    <p className="text-[8px] tracking-[0.25em] uppercase text-white/25 mb-1">Contact</p>
+                                    <p className="text-xs text-white/60">{o.email || "—"}</p>
+                                    <a
+                                      href={`https://wa.me/${o.phone.replace(/\D/g, "").replace(/^0/, "255")}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs text-emerald-400/70 hover:text-emerald-400 transition-colors"
+                                    >
+                                      WhatsApp {o.phone}
+                                    </a>
+                                  </div>
+                                  <div>
+                                    <p className="text-[8px] tracking-[0.25em] uppercase text-white/25 mb-1">Delivery Note</p>
+                                    <p className="text-xs text-white/60">{o.delivery_note || "—"}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    ))}
+                    {orders.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-20 text-center text-[9px] tracking-[0.3em] uppercase text-white/15">
+                          No orders yet
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </section>
         )}
 
@@ -801,7 +1059,7 @@ export default function AdminPage() {
                 <div className="flex items-center gap-2">
                   <span className="text-[8px] tracking-[0.25em] uppercase text-white/20 shrink-0">Status</span>
                   <div className="flex gap-1">
-                    {([["all", "All"], ["live", "Live"], ["coming-soon", "Coming Soon"]] as const).map(([v, label]) => (
+                    {([["all", "All"], ["live", "Live"], ["coming-soon", "Coming Soon"], ["out-of-stock", "Out of Stock"]] as const).map(([v, label]) => (
                       <button
                         key={v}
                         onClick={() => setFilterStatus(v)}
@@ -858,7 +1116,7 @@ export default function AdminPage() {
                 <table className="w-full min-w-[700px]">
                   <thead>
                     <tr className="border-b border-white/[0.08]">
-                      {["", "Name", "Category", "Price (TZS)", "Badge", "Status", ""].map((h, i) => (
+                      {["", "Name", "Category", "Price (TZS)", "Stock", "Badge", "Status", ""].map((h, i) => (
                         <th key={i} className="text-left text-[9px] tracking-[0.25em] uppercase text-white/25 px-4 py-3 font-normal">{h}</th>
                       ))}
                     </tr>
@@ -887,6 +1145,15 @@ export default function AdminPage() {
                         </td>
                         <td className="px-4 py-3 text-xs text-white/50">{p.category}</td>
                         <td className="px-4 py-3 text-xs text-white/50 tabular-nums">{p.price.toLocaleString("en-TZ")}</td>
+                        <td className="px-4 py-3">
+                          {(p.stock ?? 0) === 0 ? (
+                            <span className="text-[9px] tracking-wider uppercase text-red-400/70">Out</span>
+                          ) : (
+                            <span className={`text-xs tabular-nums ${(p.stock ?? 0) <= 5 ? "text-amber-400/80" : "text-white/50"}`}>
+                              {p.stock}
+                            </span>
+                          )}
+                        </td>
                         <td className="px-4 py-3">
                           {p.badge ? (
                             <span className="text-[9px] tracking-wider uppercase border border-white/20 px-2 py-0.5 text-white/50">{p.badge}</span>
@@ -917,7 +1184,7 @@ export default function AdminPage() {
                     ))}
                     {visibleProducts.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="px-4 py-20 text-center text-[9px] tracking-[0.3em] uppercase text-white/15">
+                        <td colSpan={8} className="px-4 py-20 text-center text-[9px] tracking-[0.3em] uppercase text-white/15">
                           {products.length === 0 ? "No products yet" : "No products match the current filters"}
                         </td>
                       </tr>
@@ -1008,8 +1275,11 @@ export default function AdminPage() {
                 </Field>
               </div>
 
-              {/* Badge + Status */}
+              {/* Stock + Badge */}
               <div className="grid grid-cols-2 gap-3">
+                <Field label="Units in Stock" required>
+                  <input type="number" min={0} value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} placeholder="0" required className={inputCls} />
+                </Field>
                 <Field label="Badge">
                   <select value={form.badge} onChange={(e) => setForm({ ...form, badge: e.target.value })} className={selectCls}>
                     <option value="">None</option>
@@ -1017,13 +1287,15 @@ export default function AdminPage() {
                     <option value="Best Seller">Best Seller</option>
                   </select>
                 </Field>
-                <Field label="Status">
-                  <label className="flex items-center gap-2.5 h-[42px] cursor-pointer">
-                    <input type="checkbox" checked={form.isComingSoon} onChange={(e) => setForm({ ...form, isComingSoon: e.target.checked })} className="w-3.5 h-3.5 accent-white" />
-                    <span className="text-xs text-white/60">Coming Soon</span>
-                  </label>
-                </Field>
               </div>
+
+              {/* Status */}
+              <Field label="Status">
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input type="checkbox" checked={form.isComingSoon} onChange={(e) => setForm({ ...form, isComingSoon: e.target.checked })} className="w-3.5 h-3.5 accent-white" />
+                  <span className="text-xs text-white/60">Coming Soon</span>
+                </label>
+              </Field>
 
               {/* Multi-image gallery */}
               <ImageGalleryEditor

@@ -29,5 +29,6 @@ export function fromRow(row: any): PDPProduct {
     materials: row.materials ?? "",
     care: row.care ?? "",
     isComingSoon: row.is_coming_soon ?? false,
+    stock: row.stock_quantity ?? 0,
   };
 }

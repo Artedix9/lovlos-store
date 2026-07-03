@@ -64,6 +64,7 @@ export async function POST(req: NextRequest) {
     materials: body.materials ?? "",
     care: body.care ?? "",
     is_coming_soon: body.isComingSoon ?? false,
+    stock_quantity: Math.max(0, Number(body.stock) || 0),
     sort_order: maxSort,
   };
 
@@ -95,6 +96,7 @@ export async function PUT(req: NextRequest) {
   if (body.materials !== undefined) updates.materials = body.materials;
   if (body.care !== undefined) updates.care = body.care;
   if (body.isComingSoon !== undefined) updates.is_coming_soon = body.isComingSoon;
+  if (body.stock !== undefined) updates.stock_quantity = Math.max(0, Number(body.stock) || 0);
 
   const { data, error } = await getSupabase()
     .from("products")

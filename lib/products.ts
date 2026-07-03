@@ -20,6 +20,7 @@ export interface PDPProduct {
   materials: string;
   care: string;
   isComingSoon?: boolean;
+  stock?: number;        // units on hand — 0 = out of stock
 }
 
 export const PRODUCTS: PDPProduct[] = productsData as PDPProduct[];
