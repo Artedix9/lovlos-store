@@ -13,7 +13,9 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await getSupabase().from("site_settings").select("key, value");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(Object.fromEntries((data ?? []).map((r) => [r.key, r.value])));
+  /* vapid_private stays server-side only */
+  const rows = (data ?? []).filter((r) => !r.key.startsWith("vapid"));
+  return NextResponse.json(Object.fromEntries(rows.map((r) => [r.key, r.value])));
 }
 
 /** PUT { key, value } — currently used for the announcement bar text. */

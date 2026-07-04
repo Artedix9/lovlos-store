@@ -449,10 +449,11 @@ export default function ProductPageClient({
     addItem({
       id: product.id,
       name: product.name,
-      size: selectedSize ?? "One Size",
+      size: selectedSize ?? product.sizes[0] ?? "One Size",
       color: selectedColor?.name,
       price,
       image: heroImage,
+      maxStock: product.stock,
     });
     openCart();
     showToast(

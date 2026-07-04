@@ -1,0 +1,42 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getSupabase } from "@/lib/supabase";
+
+function checkAuth(req: NextRequest): boolean {
+  const secret = process.env.ADMIN_SECRET;
+  if (!secret) return false;
+  return req.headers.get("x-admin-key") === secret;
+}
+
+/** GET → VAPID public key + how many devices are subscribed. */
+export async function GET(req: NextRequest) {
+  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const db = getSupabase();
+  const [{ data: keyRow }, { count }] = await Promise.all([
+    db.from("site_settings").select("value").eq("key", "vapid_public").maybeSingle(),
+    db.from("push_subscriptions").select("id", { count: "exact", head: true }),
+  ]);
+
+  if (!keyRow?.value) {
+    return NextResponse.json({ error: "Push keys are not configured." }, { status: 500 });
+  }
+  return NextResponse.json({ publicKey: keyRow.value, devices: count ?? 0 });
+}
+
+/** POST { subscription } → register this browser for new-order alerts. */
+export async function POST(req: NextRequest) {
+  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const body = await req.json();
+  const subscription = body?.subscription;
+  if (!subscription?.endpoint) {
+    return NextResponse.json({ error: "Missing subscription" }, { status: 400 });
+  }
+
+  const { error } = await getSupabase()
+    .from("push_subscriptions")
+    .upsert({ endpoint: subscription.endpoint, subscription }, { onConflict: "endpoint" });
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ success: true }, { status: 201 });
+}

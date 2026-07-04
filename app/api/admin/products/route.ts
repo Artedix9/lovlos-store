@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     badge: body.badge || null,
     images: body.images ?? [],
     colors: body.colors ?? [],
-    sizes: body.sizes ?? ["XS", "S", "M", "L", "XL"],
+    sizes: Array.isArray(body.sizes) && body.sizes.length > 0 ? body.sizes : ["XS", "S", "M", "L", "XL"],
     description: body.description ?? "",
     materials: body.materials ?? "",
     care: body.care ?? "",

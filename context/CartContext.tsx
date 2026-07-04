@@ -20,6 +20,8 @@ export interface CartItem {
   price: number;    // TZS
   quantity: number;
   image: string;
+  /** Units available — quantity is capped here; undefined = uncapped */
+  maxStock?: number;
 }
 
 interface CartContextValue {
@@ -79,7 +81,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
       );
       if (idx !== -1) {
         const updated = [...prev];
-        updated[idx] = { ...updated[idx], quantity: updated[idx].quantity + 1 };
+        const cap = incoming.maxStock ?? updated[idx].maxStock;
+        const next = updated[idx].quantity + 1;
+        updated[idx] = {
+          ...updated[idx],
+          /* refresh price/stock from the latest product data */
+          price: incoming.price,
+          maxStock: incoming.maxStock,
+          quantity: cap !== undefined ? Math.min(next, Math.max(1, cap)) : next,
+        };
         return updated;
       }
       return [...prev, { ...incoming, quantity: 1 }];
@@ -92,11 +102,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
     (id: string, size: string, color: string | undefined, delta: number) => {
       setItems((prev) =>
         prev
-          .map((item) =>
-            item.id === id && item.size === size && item.color === color
-              ? { ...item, quantity: item.quantity + delta }
-              : item
-          )
+          .map((item) => {
+            if (!(item.id === id && item.size === size && item.color === color)) return item;
+            const next = item.quantity + delta;
+            const capped = item.maxStock !== undefined ? Math.min(next, Math.max(1, item.maxStock)) : next;
+            return { ...item, quantity: capped };
+          })
           .filter((item) => item.quantity > 0)
       );
     },

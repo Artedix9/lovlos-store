@@ -47,6 +47,7 @@ interface FormState {
   fit: string;
   fitNotes: string;
   styledWith: string[];
+  sizes: string;
 }
 
 const DEFAULT_FORM: FormState = {
@@ -66,7 +67,14 @@ const DEFAULT_FORM: FormState = {
   fit: "",
   fitNotes: "",
   styledWith: [],
+  sizes: "XS, S, M, L, XL",
 };
+
+const SIZE_PRESETS: [string, string][] = [
+  ["Apparel", "XS, S, M, L, XL"],
+  ["One Size", "One Size"],
+  ["Numeric", "38, 39, 40, 41, 42, 43, 44"],
+];
 
 const CATEGORIES = ["Men", "Women", "Accessories"] as const;
 const ACCEPT = "image/jpeg,image/jpg,image/png,image/webp";
@@ -86,6 +94,13 @@ const STATUS_CLS: Record<SavedOrder["status"], string> = {
 
 function formatOrderDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function urlBase64ToUint8Array(base64: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+  const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = window.atob(b64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
 }
 
 /** Normalise stored digits to international format for wa.me links. */
@@ -519,6 +534,11 @@ export default function AdminPage() {
   const [reviewsError, setReviewsError] = useState("");
   const [reviewActing, setReviewActing] = useState<string | null>(null);
 
+  // Order alerts (web push)
+  const [pushState, setPushState] = useState<"idle" | "enabling" | "enabled" | "denied" | "unsupported" | "error">("idle");
+  const [pushDevices, setPushDevices] = useState<number | null>(null);
+  const [pushError, setPushError] = useState("");
+
   // Announcement bar
   const [announcement, setAnnouncement] = useState("");
   const [announcementSaving, setAnnouncementSaving] = useState(false);
@@ -685,6 +705,7 @@ export default function AdminPage() {
       fit: p.fit ?? "",
       fitNotes: p.fitNotes ?? "",
       styledWith: p.styledWith ?? [],
+      sizes: (p.sizes ?? []).join(", "),
     });
     setActionError("");
     setShowModal(true);
@@ -724,6 +745,7 @@ export default function AdminPage() {
       fit: form.fit || null,
       fitNotes: form.fitNotes,
       styledWith: form.styledWith,
+      sizes: form.sizes.split(",").map((s) => s.trim()).filter(Boolean),
     };
 
     try {
@@ -787,6 +809,66 @@ export default function AdminPage() {
       if (res.ok) setRestockRequests((prev) => prev.filter((r) => r.id !== id));
     } catch { /* silent — row stays, admin can retry */ } finally {
       setRestockClearing(null);
+    }
+  };
+
+  // ── Order alerts (web push) ────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!adminKey) return;
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      setPushState("unsupported");
+      return;
+    }
+    // Reflect an existing subscription and fetch the device count
+    navigator.serviceWorker.getRegistration("/sw.js").then(async (reg) => {
+      const sub = await reg?.pushManager.getSubscription();
+      if (sub) setPushState("enabled");
+    });
+    fetch("/api/admin/push", { headers: { "x-admin-key": adminKey } })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => { if (json) setPushDevices(json.devices); })
+      .catch(() => { /* count is cosmetic */ });
+  }, [adminKey]);
+
+  const handleEnablePush = async () => {
+    if (!adminKey) return;
+    setPushState("enabling");
+    setPushError("");
+    try {
+      const keyRes = await fetch("/api/admin/push", { headers: { "x-admin-key": adminKey } });
+      const keyJson = await keyRes.json();
+      if (!keyRes.ok) throw new Error(keyJson?.error ?? "Push not configured");
+
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setPushState("denied");
+        return;
+      }
+
+      const reg = await navigator.serviceWorker.register("/sw.js");
+      await navigator.serviceWorker.ready;
+      const subscription =
+        (await reg.pushManager.getSubscription()) ??
+        (await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(keyJson.publicKey) as BufferSource,
+        }));
+
+      const saveRes = await fetch("/api/admin/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify({ subscription }),
+      });
+      if (!saveRes.ok) {
+        const json = await saveRes.json().catch(() => null);
+        throw new Error(json?.error ?? "Failed to save subscription");
+      }
+      setPushState("enabled");
+      setPushDevices((n) => (n ?? 0) + 1);
+    } catch (e) {
+      setPushError(e instanceof Error && e.message ? e.message : "Could not enable alerts.");
+      setPushState("error");
     }
   };
 
@@ -1513,6 +1595,34 @@ export default function AdminPage() {
         {/* ── Site & Banners ────────────────────────────────────────────────── */}
         {activeTab === "hero" && (
           <section>
+            <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-2">Order Alerts</p>
+            <p className="text-[9px] text-white/20 mb-4">Get a notification on this device the moment a new order comes in — even with the dashboard closed.</p>
+            <div className="border border-white/10 p-5 mb-10 flex flex-wrap items-center gap-4">
+              {pushState === "enabled" ? (
+                <p className="text-xs text-emerald-400/70">✓ Alerts are on for this device</p>
+              ) : pushState === "unsupported" ? (
+                <p className="text-xs text-white/40">This browser doesn&apos;t support push notifications.</p>
+              ) : pushState === "denied" ? (
+                <p className="text-xs text-amber-400/70">Notifications are blocked — allow them for this site in your browser settings, then try again.</p>
+              ) : (
+                <button
+                  onClick={handleEnablePush}
+                  disabled={pushState === "enabling"}
+                  className="bg-white text-black text-[9px] tracking-[0.3em] uppercase px-6 py-2.5 font-bold hover:bg-white/90 transition-colors disabled:opacity-40"
+                >
+                  {pushState === "enabling" ? "Enabling..." : "Enable Alerts on This Device"}
+                </button>
+              )}
+              {pushDevices !== null && (
+                <p className="text-[10px] text-white/25">
+                  {pushDevices} {pushDevices === 1 ? "device" : "devices"} subscribed
+                </p>
+              )}
+              {pushState === "error" && pushError && (
+                <p className="text-red-400/80 text-[10px] tracking-wider w-full">{pushError}</p>
+              )}
+            </div>
+
             <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-2">Announcement Bar</p>
             <p className="text-[9px] text-white/20 mb-4">Shown at the very top of every page. Leave empty to hide the bar.</p>
             <div className="border border-white/10 p-5 mb-10">
@@ -1629,6 +1739,30 @@ export default function AdminPage() {
                   </select>
                 </Field>
               </div>
+
+              {/* Sizes */}
+              <Field label="Sizes" required>
+                <input
+                  type="text"
+                  value={form.sizes}
+                  onChange={(e) => setForm({ ...form, sizes: e.target.value })}
+                  placeholder="Comma-separated, e.g. XS, S, M, L, XL"
+                  required
+                  className={inputCls}
+                />
+                <div className="flex gap-1.5 mt-1.5">
+                  {SIZE_PRESETS.map(([label, value]) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => setForm({ ...form, sizes: value })}
+                      className="text-[8px] tracking-[0.2em] uppercase border border-white/15 text-white/30 hover:border-white/35 hover:text-white/60 px-2 py-1 transition-colors"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </Field>
 
               {/* Status */}
               <Field label="Status">

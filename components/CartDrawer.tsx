@@ -161,11 +161,15 @@ export default function CartDrawer() {
                         <button
                           aria-label={`Increase quantity of ${item.name}`}
                           onClick={() => updateQuantity(item.id, item.size, item.color, +1)}
-                          className="w-8 h-8 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/5 transition-colors duration-150 text-base leading-none focus-visible:outline-none focus-visible:bg-white/10"
+                          disabled={item.maxStock !== undefined && item.quantity >= item.maxStock}
+                          className="w-8 h-8 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/5 transition-colors duration-150 text-base leading-none focus-visible:outline-none focus-visible:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-white/60"
                         >
                           +
                         </button>
                       </div>
+                      {item.maxStock !== undefined && item.quantity >= item.maxStock && (
+                        <span className="text-[9px] tracking-widest uppercase text-white/40">Max stock</span>
+                      )}
                       <button
                         onClick={() => removeItem(item.id, item.size, item.color)}
                         aria-label={`Remove ${item.name} from bag`}

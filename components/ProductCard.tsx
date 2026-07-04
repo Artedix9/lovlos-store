@@ -70,6 +70,7 @@ export default function ProductCard({
       color: selectedColor?.name,
       price,
       image: imageSrc ?? "",
+      maxStock: product.stock,
     });
     showToast(
       `${product.name}${selectedColor ? ` — ${selectedColor.name}` : ""} added to bag.`
@@ -84,7 +85,7 @@ export default function ProductCard({
     e.stopPropagation();
     if (added || comingSoon || soldOut) return;
     if (isOneSize) {
-      quickAdd("One Size");
+      quickAdd(product.sizes?.[0] ?? "One Size");
     } else {
       setPickerOpen((v) => !v);
     }
