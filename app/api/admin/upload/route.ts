@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/adminAuth";
 import { createClient } from "@supabase/supabase-js";
 
 function supabase() {
@@ -8,14 +9,9 @@ function supabase() {
   );
 }
 
-function checkAuth(req: NextRequest): boolean {
-  const secret = process.env.ADMIN_SECRET;
-  if (!secret) return false;
-  return req.headers.get("x-admin-key") === secret;
-}
-
 export async function POST(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = requireAdmin(req);
+  if (denied) return denied;
 
   const form = await req.formData();
   const file = form.get("file") as File | null;

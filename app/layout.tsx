@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Cormorant_Garamond } from "next/font/google";
 import Providers from "@/components/Providers";
 import AnnouncementBar from "@/components/AnnouncementBar";
+import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
 const inter = Inter({
@@ -56,6 +57,7 @@ export default function RootLayout({
         </a>
         <AnnouncementBar />
         <Providers>{children}</Providers>
+        <Analytics />
       </body>
     </html>
   );

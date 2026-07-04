@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/adminAuth";
 import { getSupabase } from "@/lib/supabase";
-
-function checkAuth(req: NextRequest): boolean {
-  const secret = process.env.ADMIN_SECRET;
-  if (!secret) return false;
-  return req.headers.get("x-admin-key") === secret;
-}
 
 /** GET → VAPID public key + how many devices are subscribed. */
 export async function GET(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = requireAdmin(req);
+  if (denied) return denied;
 
   const db = getSupabase();
   const [{ data: keyRow }, { count }] = await Promise.all([
@@ -25,7 +21,8 @@ export async function GET(req: NextRequest) {
 
 /** POST { subscription } → register this browser for new-order alerts. */
 export async function POST(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = requireAdmin(req);
+  if (denied) return denied;
 
   const body = await req.json();
   const subscription = body?.subscription;

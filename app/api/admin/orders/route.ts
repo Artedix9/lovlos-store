@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/adminAuth";
 import { getSupabase } from "@/lib/supabase";
 
 const VALID_STATUSES = ["pending", "confirmed", "dispatched", "delivered", "cancelled"] as const;
 
-function checkAuth(req: NextRequest): boolean {
-  const secret = process.env.ADMIN_SECRET;
-  if (!secret) return false;
-  return req.headers.get("x-admin-key") === secret;
-}
-
 export async function GET(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = requireAdmin(req);
+  if (denied) return denied;
 
   const { data, error } = await getSupabase()
     .from("orders")
@@ -22,7 +18,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = requireAdmin(req);
+  if (denied) return denied;
 
   const body = await req.json();
   const { id, status } = body as { id?: string; status?: string };

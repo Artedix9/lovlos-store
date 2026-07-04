@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/adminAuth";
 import { revalidatePath } from "next/cache";
-import { getSupabase, fromRow } from "@/lib/supabase";
+import { getSupabase, fromRow, storagePathFromUrl } from "@/lib/supabase";
 
 function revalidateAll(productId?: string) {
   revalidatePath("/");
@@ -10,12 +11,6 @@ function revalidateAll(productId?: string) {
   // Stock/price edits must show on the product page immediately, not after
   // the hourly ISR window — e.g. restock alerts link customers straight here.
   if (productId) revalidatePath(`/product/${productId}`);
-}
-
-function checkAuth(req: NextRequest): boolean {
-  const secret = process.env.ADMIN_SECRET;
-  if (!secret) return false;
-  return req.headers.get("x-admin-key") === secret;
 }
 
 /** null = no sale; otherwise must be a positive amount below the regular price. */
@@ -37,7 +32,8 @@ function generateId(name: string): string {
 }
 
 export async function GET(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = requireAdmin(req);
+  if (denied) return denied;
 
   const { data, error } = await getSupabase().from("products").select("*").order("sort_order");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -45,7 +41,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = requireAdmin(req);
+  if (denied) return denied;
 
   const body = await req.json();
   if (!body.name || !body.category || !body.price) {
@@ -95,7 +92,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = requireAdmin(req);
+  if (denied) return denied;
 
   const body = await req.json();
   if (!body.id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
@@ -141,13 +139,41 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = requireAdmin(req);
+  if (denied) return denied;
 
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
-  const { error } = await getSupabase().from("products").delete().eq("id", id);
+  const db = getSupabase();
+
+  /* Collect everything the product owns before deleting the row */
+  const [{ data: product }, { data: productReviews }] = await Promise.all([
+    db.from("products").select("images, colors").eq("id", id).maybeSingle(),
+    db.from("product_reviews").select("photo_url").eq("product_id", id),
+  ]);
+
+  const { error } = await db.from("products").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  /* Best-effort cleanup — the product is already gone, so never fail the request */
+  try {
+    await Promise.all([
+      db.from("product_reviews").delete().eq("product_id", id),
+      db.from("restock_requests").delete().eq("product_id", id),
+    ]);
+
+    const urls: string[] = [
+      ...(product?.images ?? []),
+      ...((product?.colors ?? []) as { image?: string }[]).map((c) => c.image ?? ""),
+      ...(productReviews ?? []).map((r) => r.photo_url ?? ""),
+    ];
+    const paths = urls.map(storagePathFromUrl).filter((p): p is string => !!p);
+    if (paths.length) await db.storage.from("product-images").remove(paths);
+  } catch (cleanupErr) {
+    console.error("[LOVLOS DELETE CLEANUP]", cleanupErr);
+  }
+
   revalidateAll(id);
   return NextResponse.json({ success: true });
 }

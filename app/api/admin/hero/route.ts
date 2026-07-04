@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/adminAuth";
 import { revalidatePath } from "next/cache";
 import { getSupabase } from "@/lib/supabase";
 import { getAllHeroImages } from "@/lib/hero";
@@ -13,20 +14,16 @@ const PAGE_PATHS: Record<Page, string> = {
   accessories: "/accessories",
 };
 
-function checkAuth(req: NextRequest): boolean {
-  const secret = process.env.ADMIN_SECRET;
-  if (!secret) return false;
-  return req.headers.get("x-admin-key") === secret;
-}
-
 export async function GET(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = requireAdmin(req);
+  if (denied) return denied;
   const heroes = await getAllHeroImages();
   return NextResponse.json(heroes);
 }
 
 export async function PUT(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = requireAdmin(req);
+  if (denied) return denied;
 
   const body = await req.json();
   const { page, desktop_src, mobile_src } = body;

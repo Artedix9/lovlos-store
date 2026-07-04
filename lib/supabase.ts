@@ -13,6 +13,14 @@ export function getSupabase(): SupabaseClient {
   return _client;
 }
 
+/** Storage path inside the product-images bucket, or null for external/local URLs. */
+export function storagePathFromUrl(url: string): string | null {
+  const marker = "/storage/v1/object/public/product-images/";
+  const i = url.indexOf(marker);
+  if (i === -1) return null;
+  return decodeURIComponent(url.slice(i + marker.length));
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function fromRow(row: any): PDPProduct {
   return {

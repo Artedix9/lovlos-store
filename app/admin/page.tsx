@@ -660,6 +660,9 @@ export default function AdminPage() {
         sessionStorage.setItem("lvl-admin-key", inputKey);
         setAdminKey(inputKey);
         setProducts(await res.json());
+      } else if (res.status === 429) {
+        const json = await res.json().catch(() => null);
+        setLoginError(json?.error ?? "Too many attempts. Try again in a few minutes.");
       } else {
         setLoginError("Invalid access key.");
       }
@@ -988,6 +991,33 @@ export default function AdminPage() {
       setHeroError(e instanceof Error && e.message ? `Failed to save: ${e.message}` : "Failed to save. Try again.");
     } finally {
       setHeroSaving(null);
+    }
+  };
+
+  // ── Reorder (storefront display order) ─────────────────────────────────────
+
+  const canReorder = !search && filterCategory === "all" && filterStatus === "all" && filterBadge === "all";
+
+  const handleMove = async (index: number, dir: -1 | 1) => {
+    if (!adminKey) return;
+    const target = index + dir;
+    if (target < 0 || target >= products.length) return;
+    const next = [...products];
+    [next[index], next[target]] = [next[target], next[index]];
+    setProducts(next);
+    try {
+      const res = await fetch("/api/admin/products/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify({ ids: next.map((p) => p.id) }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error ?? "");
+      }
+    } catch (e) {
+      fetchProducts(adminKey); // fall back to the server's order
+      setActionError(e instanceof Error && e.message ? `Failed to reorder: ${e.message}` : "Failed to reorder. Try again.");
     }
   };
 
@@ -1430,7 +1460,7 @@ export default function AdminPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleProducts.map((p) => (
+                    {visibleProducts.map((p, rowIdx) => (
                       <tr key={p.id} className="border-b border-white/[0.04] hover:bg-white/[0.015] transition-colors group">
                         <td className="px-4 py-3 w-14">
                           <div className="w-10 h-10 bg-white/5 border border-white/10 overflow-hidden flex-shrink-0">
@@ -1493,6 +1523,26 @@ export default function AdminPage() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {canReorder && (
+                              <span className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleMove(rowIdx, -1)}
+                                  disabled={rowIdx === 0}
+                                  aria-label={`Move ${p.name} up`}
+                                  className="text-white/30 hover:text-white transition-colors disabled:opacity-20 disabled:hover:text-white/30 px-1"
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  onClick={() => handleMove(rowIdx, 1)}
+                                  disabled={rowIdx === visibleProducts.length - 1}
+                                  aria-label={`Move ${p.name} down`}
+                                  className="text-white/30 hover:text-white transition-colors disabled:opacity-20 disabled:hover:text-white/30 px-1"
+                                >
+                                  ↓
+                                </button>
+                              </span>
+                            )}
                             <button onClick={() => openEdit(p)} className="text-[9px] tracking-[0.2em] uppercase text-white/40 hover:text-white transition-colors">EDIT</button>
                             <button
                               onClick={() => handleDelete(p.id, p.name)}

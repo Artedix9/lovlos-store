@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/adminAuth";
 import { revalidatePath } from "next/cache";
 import { getSupabase } from "@/lib/supabase";
 
-function checkAuth(req: NextRequest): boolean {
-  const secret = process.env.ADMIN_SECRET;
-  if (!secret) return false;
-  return req.headers.get("x-admin-key") === secret;
-}
-
 export async function GET(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = requireAdmin(req);
+  if (denied) return denied;
 
   const { data, error } = await getSupabase().from("site_settings").select("key, value");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -20,7 +16,8 @@ export async function GET(req: NextRequest) {
 
 /** PUT { key, value } — currently used for the announcement bar text. */
 export async function PUT(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = requireAdmin(req);
+  if (denied) return denied;
 
   const body = await req.json();
   const { key, value } = body as { key?: string; value?: string };

@@ -4,7 +4,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { getProducts } from "@/lib/data";
 import { getApprovedReviews } from "@/lib/reviews";
-import type { PDPProduct } from "@/lib/products";
+import { effectivePrice, type PDPProduct } from "@/lib/products";
 import type { Product } from "@/components/ProductCard";
 import ProductPageClient from "./ProductPageClient";
 
@@ -88,5 +88,51 @@ export default async function ProductPage(
     .slice(0, 4)
     .map(toCard);
 
-  return <ProductPageClient product={product} related={related} reviews={reviews} styledWith={styledWith} />;
+  /* Product structured data — puts price, availability, and stars in Google results */
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: product.description,
+    image: product.images.filter(Boolean).map((src) =>
+      src.startsWith("http") ? src : `https://lovlos.vercel.app${src}`
+    ),
+    brand: { "@type": "Brand", name: "LOVLOS" },
+    offers: {
+      "@type": "Offer",
+      url: `https://lovlos.vercel.app/product/${product.id}`,
+      priceCurrency: "TZS",
+      price: effectivePrice(product),
+      availability:
+        (product.stock ?? 0) > 0
+          ? "https://schema.org/InStock"
+          : "https://schema.org/OutOfStock",
+    },
+    ...(reviews.length > 0
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1),
+            reviewCount: reviews.length,
+          },
+          review: reviews.slice(0, 5).map((r) => ({
+            "@type": "Review",
+            author: { "@type": "Person", name: r.author },
+            reviewRating: { "@type": "Rating", ratingValue: r.rating },
+            reviewBody: r.body,
+            datePublished: r.created_at.slice(0, 10),
+          })),
+        }
+      : {}),
+  };
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <ProductPageClient product={product} related={related} reviews={reviews} styledWith={styledWith} />
+    </>
+  );
 }

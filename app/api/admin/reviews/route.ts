@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/adminAuth";
 import { revalidatePath } from "next/cache";
-import { getSupabase } from "@/lib/supabase";
-
-function checkAuth(req: NextRequest): boolean {
-  const secret = process.env.ADMIN_SECRET;
-  if (!secret) return false;
-  return req.headers.get("x-admin-key") === secret;
-}
+import { getSupabase, storagePathFromUrl } from "@/lib/supabase";
 
 export async function GET(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = requireAdmin(req);
+  if (denied) return denied;
 
   const { data, error } = await getSupabase()
     .from("product_reviews")
@@ -23,7 +19,8 @@ export async function GET(req: NextRequest) {
 
 /** PUT { id, approved } — approve (or unpublish) a review. */
 export async function PUT(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = requireAdmin(req);
+  if (denied) return denied;
 
   const body = await req.json();
   const { id, approved } = body as { id?: string; approved?: boolean };
@@ -44,12 +41,14 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = requireAdmin(req);
+  if (denied) return denied;
 
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
-  const { data, error } = await getSupabase()
+  const db = getSupabase();
+  const { data, error } = await db
     .from("product_reviews")
     .delete()
     .eq("id", id)
@@ -57,6 +56,11 @@ export async function DELETE(req: NextRequest) {
     .maybeSingle();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  if (data) revalidatePath(`/product/${data.product_id}`);
+  if (data) {
+    revalidatePath(`/product/${data.product_id}`);
+    /* Best-effort: drop the review photo from storage too */
+    const path = data.photo_url ? storagePathFromUrl(data.photo_url) : null;
+    if (path) await db.storage.from("product-images").remove([path]).catch(() => {});
+  }
   return NextResponse.json({ success: true });
 }
