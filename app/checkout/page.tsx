@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -11,6 +11,7 @@ import { formatTZS } from "@/lib/products";
 import { buildWhatsAppUrl, generateOrderId } from "@/lib/orders";
 import type { OrderPayload, SavedOrder } from "@/lib/orders";
 import { deliveryFeeFor } from "@/lib/delivery";
+import { recordOrder, getCheckoutProfile, saveCheckoutProfile } from "@/lib/orderHistory";
 
 const CITIES = [
   "Dar es Salaam",
@@ -91,6 +92,20 @@ export default function CheckoutPage() {
   const [placing, setPlacing] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
+  /* Returning customers: prefill from the last order's details */
+  useEffect(() => {
+    const profile = getCheckoutProfile();
+    if (profile) {
+      setForm((prev) => ({
+        ...prev,
+        name: profile.name,
+        phone: profile.phone,
+        email: profile.email,
+        city: profile.city || prev.city,
+      }));
+    }
+  }, []);
+
   const deliveryFee = deliveryFeeFor(subtotal);
   const total = subtotal + deliveryFee;
 
@@ -163,6 +178,21 @@ export default function CheckoutPage() {
       }
 
       const { order }: { order: SavedOrder } = await res.json();
+
+      /* Remember this order and the customer's details for next time */
+      recordOrder({
+        id: order.id,
+        phone: order.phone,
+        total: order.total,
+        city: order.city,
+        created_at: order.created_at,
+      });
+      saveCheckoutProfile({
+        name: form.name.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim(),
+        city: form.city,
+      });
 
       /* Open WhatsApp in a new tab with the full invoice message */
       window.open(buildWhatsAppUrl(order), "_blank", "noopener,noreferrer");

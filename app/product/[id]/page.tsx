@@ -71,8 +71,16 @@ export default async function ProductPage(
     );
   }
 
-  /* Related: same category first, then the rest of the catalog, max 4 */
-  const pool = products.filter((p) => p.id !== product.id && !p.isComingSoon);
+  /* Curated "Style It With" pairings — in the admin's chosen order */
+  const styledWith = (product.styledWith ?? [])
+    .map((sid) => products.find((p) => p.id === sid))
+    .filter((p): p is PDPProduct => !!p && !p.isComingSoon)
+    .map(toCard);
+  const styledIds = new Set(styledWith.map((p) => p.id));
+
+  /* Related: same category first, then the rest of the catalog, max 4.
+     Skips curated pairings so the two rows never repeat a product. */
+  const pool = products.filter((p) => p.id !== product.id && !p.isComingSoon && !styledIds.has(p.id));
   const related = [
     ...pool.filter((p) => p.category === product.category),
     ...pool.filter((p) => p.category !== product.category),
@@ -80,5 +88,5 @@ export default async function ProductPage(
     .slice(0, 4)
     .map(toCard);
 
-  return <ProductPageClient product={product} related={related} reviews={reviews} />;
+  return <ProductPageClient product={product} related={related} reviews={reviews} styledWith={styledWith} />;
 }

@@ -44,6 +44,9 @@ interface FormState {
   materials: string;
   care: string;
   isComingSoon: boolean;
+  fit: string;
+  fitNotes: string;
+  styledWith: string[];
 }
 
 const DEFAULT_FORM: FormState = {
@@ -60,6 +63,9 @@ const DEFAULT_FORM: FormState = {
   materials: "",
   care: "",
   isComingSoon: false,
+  fit: "",
+  fitNotes: "",
+  styledWith: [],
 };
 
 const CATEGORIES = ["Men", "Women", "Accessories"] as const;
@@ -676,6 +682,9 @@ export default function AdminPage() {
       materials: p.materials ?? "",
       care: p.care ?? "",
       isComingSoon: p.isComingSoon ?? false,
+      fit: p.fit ?? "",
+      fitNotes: p.fitNotes ?? "",
+      styledWith: p.styledWith ?? [],
     });
     setActionError("");
     setShowModal(true);
@@ -712,6 +721,9 @@ export default function AdminPage() {
       materials: form.materials,
       care: form.care,
       isComingSoon: form.isComingSoon,
+      fit: form.fit || null,
+      fitNotes: form.fitNotes,
+      styledWith: form.styledWith,
     };
 
     try {
@@ -1656,6 +1668,71 @@ export default function AdminPage() {
               <Field label="Care">
                 <textarea value={form.care} onChange={(e) => setForm({ ...form, care: e.target.value })} placeholder="e.g. Machine wash cold..." rows={2} className={textareaCls} />
               </Field>
+
+              {/* Fit */}
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Fit">
+                  <select value={form.fit} onChange={(e) => setForm({ ...form, fit: e.target.value })} className={selectCls}>
+                    <option value="">Not specified</option>
+                    <option value="runs-small">Runs Small</option>
+                    <option value="true-to-size">True to Size</option>
+                    <option value="runs-large">Runs Large</option>
+                  </select>
+                </Field>
+                <Field label="Fit Notes">
+                  <input
+                    type="text"
+                    value={form.fitNotes}
+                    onChange={(e) => setForm({ ...form, fitNotes: e.target.value })}
+                    placeholder="e.g. Model is 175cm, wears M"
+                    maxLength={120}
+                    className={inputCls}
+                  />
+                </Field>
+              </div>
+
+              {/* Style It With */}
+              <div className="border border-white/10 p-4">
+                <p className="text-[9px] tracking-[0.25em] uppercase text-white/40 font-bold mb-1">Style It With</p>
+                <p className="text-[9px] text-white/20 mb-3">Curated pairings shown on the product page — outfits sell together.</p>
+
+                {form.styledWith.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {form.styledWith.map((sid) => {
+                      const sp = products.find((p) => p.id === sid);
+                      return (
+                        <span key={sid} className="inline-flex items-center gap-1.5 border border-white/20 px-2 py-1 text-[10px] text-white/60">
+                          {sp?.name ?? sid}
+                          <button
+                            type="button"
+                            onClick={() => setForm({ ...form, styledWith: form.styledWith.filter((x) => x !== sid) })}
+                            aria-label={`Remove ${sp?.name ?? sid}`}
+                            className="text-white/30 hover:text-red-400/70 transition-colors leading-none"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <select
+                  value=""
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v && !form.styledWith.includes(v)) setForm({ ...form, styledWith: [...form.styledWith, v] });
+                  }}
+                  className={selectCls}
+                >
+                  <option value="">+ Add a product...</option>
+                  {products
+                    .filter((p) => p.id !== editId && !form.styledWith.includes(p.id) && !p.isComingSoon)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.category})</option>
+                    ))}
+                </select>
+              </div>
 
               {actionError && <p className="text-red-400/80 text-[10px] tracking-wider">{actionError}</p>}
 

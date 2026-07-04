@@ -22,6 +22,9 @@ export interface PDPProduct {
   care: string;
   isComingSoon?: boolean;
   stock?: number;        // units on hand — 0 = out of stock
+  fit?: "runs-small" | "true-to-size" | "runs-large";
+  fitNotes?: string;     // e.g. "Model is 175cm and wears size M"
+  styledWith?: string[]; // curated product ids for "Style It With"
 }
 
 export const PRODUCTS: PDPProduct[] = productsData as PDPProduct[];

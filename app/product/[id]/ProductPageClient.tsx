@@ -351,10 +351,12 @@ export default function ProductPageClient({
   product,
   related = [],
   reviews = [],
+  styledWith = [],
 }: {
   product: PDPProduct;
   related?: Product[];
   reviews?: Review[];
+  styledWith?: Product[];
 }) {
   const { addItem, openCart } = useCart();
   const { showToast } = useToast();
@@ -715,6 +717,36 @@ export default function ProductPageClient({
                 </div>
               )}
 
+              {/* Fit guidance */}
+              {(product.fit || product.fitNotes) && (
+                <div className="mb-7">
+                  {product.fit && (
+                    <div className="max-w-[300px]">
+                      <div className="flex justify-between mb-1.5">
+                        {([["runs-small", "Runs Small"], ["true-to-size", "True to Size"], ["runs-large", "Runs Large"]] as const).map(([v, label]) => (
+                          <span
+                            key={v}
+                            className={`text-[10px] tracking-widest uppercase ${product.fit === v ? "text-primary font-bold" : "text-alto"}`}
+                          >
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex gap-1" aria-hidden="true">
+                        {(["runs-small", "true-to-size", "runs-large"] as const).map((v) => (
+                          <span key={v} className={`h-0.5 flex-1 ${product.fit === v ? "bg-primary" : "bg-mercury"}`} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {product.fitNotes && (
+                    <p className={`text-xs text-chicago tracking-wide ${product.fit ? "mt-2.5" : ""}`}>
+                      {product.fitNotes}
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Add to Bag + wishlist */}
               <div className="flex items-stretch gap-2" ref={atcRef}>
                 {product.isComingSoon ? (
@@ -793,6 +825,21 @@ export default function ProductPageClient({
             </div>
           </div>
         </div>
+
+        {/* ── Style It With — curated pairings ── */}
+        {styledWith.length > 0 && (
+          <section
+            aria-label="Style it with"
+            className="max-w-screen-2xl mx-auto px-6 md:px-10 lg:px-16 py-14 md:py-16 border-t border-mercury"
+          >
+            <h2 className="heading-section mb-8">Style It With</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-5">
+              {styledWith.map((p) => (
+                <ProductCard key={p.id} product={p} />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* ── Reviews ── */}
         <section
