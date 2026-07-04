@@ -3,6 +3,7 @@
 import { Fragment, useState, useEffect, useCallback, useRef } from "react";
 import { effectivePrice, type PDPProduct } from "@/lib/products";
 import type { SavedOrder } from "@/lib/orders";
+import { SITE_URL } from "@/lib/site";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1331,7 +1332,7 @@ export default function AdminPage() {
                     const product = products.find((p) => p.id === r.product_id);
                     const name = product?.name ?? r.product_id;
                     const waText = encodeURIComponent(
-                      `Hello! Great news — the ${name} you asked about is back in stock at LOVLOS. Order it here: https://lovlos.vercel.app/product/${r.product_id}`
+                      `Hello! Great news — the ${name} you asked about is back in stock at LOVLOS. Order it here: ${SITE_URL}/product/${r.product_id}`
                     );
                     return (
                       <div key={r.id} className="flex items-center gap-4 text-xs">

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Cormorant_Garamond } from "next/font/google";
 import Providers from "@/components/Providers";
 import AnnouncementBar from "@/components/AnnouncementBar";
+import { SITE_URL } from "@/lib/site";
 import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
@@ -27,7 +28,7 @@ export const metadata: Metadata = {
   },
   description:
     "High-end streetwear engineered for the vibe. Based in Tanzania, designed for the world.",
-  metadataBase: new URL("https://lovlos.vercel.app"),
+  metadataBase: new URL(SITE_URL),
   openGraph: {
     type: "website",
     siteName: "LOVLOS",

@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
 import { getProducts } from "@/lib/data";
+import { SITE_URL } from "@/lib/site";
 
-const BASE = "https://lovlos.vercel.app";
+const BASE = SITE_URL;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const products = await getProducts();

@@ -4,6 +4,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { getProducts } from "@/lib/data";
 import { getApprovedReviews } from "@/lib/reviews";
+import { SITE_URL } from "@/lib/site";
 import { effectivePrice, type PDPProduct } from "@/lib/products";
 import type { Product } from "@/components/ProductCard";
 import ProductPageClient from "./ProductPageClient";
@@ -95,12 +96,12 @@ export default async function ProductPage(
     name: product.name,
     description: product.description,
     image: product.images.filter(Boolean).map((src) =>
-      src.startsWith("http") ? src : `https://lovlos.vercel.app${src}`
+      src.startsWith("http") ? src : `${SITE_URL}${src}`
     ),
     brand: { "@type": "Brand", name: "LOVLOS" },
     offers: {
       "@type": "Offer",
-      url: `https://lovlos.vercel.app/product/${product.id}`,
+      url: `${SITE_URL}/product/${product.id}`,
       priceCurrency: "TZS",
       price: effectivePrice(product),
       availability:
