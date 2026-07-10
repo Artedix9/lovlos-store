@@ -21,7 +21,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   const productPages: MetadataRoute.Sitemap = products
-    .filter((p) => !p.isComingSoon)
+    .filter((p) => !p.isComingSoon || p.preorder)
     .map((p) => ({
       url: `${BASE}/product/${p.id}`,
       changeFrequency: "weekly" as const,

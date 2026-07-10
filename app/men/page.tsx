@@ -40,6 +40,7 @@ export default async function MenPage() {
       sizes: p.sizes,
       isComingSoon: p.isComingSoon,
       stock: p.stock,
+      preorder: p.preorder,
     }));
 
   return (

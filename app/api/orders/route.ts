@@ -55,9 +55,11 @@ export async function POST(req: NextRequest) {
     for (const item of order.items) {
       wanted.set(item.id, (wanted.get(item.id) ?? 0) + (item.quantity || 1));
     }
+    /* select("*") stays resilient while schema changes roll out — naming a
+       column that isn't live yet would fail every checkout */
     const { data: stockRows, error: stockError } = await supabase
       .from("products")
-      .select("id, name, stock_quantity")
+      .select("*")
       .in("id", [...wanted.keys()]);
     if (stockError) throw stockError;
     for (const [productId, qty] of wanted) {
@@ -68,6 +70,8 @@ export async function POST(req: NextRequest) {
           { status: 409 }
         );
       }
+      /* Pre-order items (per the DB, not the client) have no stock to check */
+      if (row.is_coming_soon && row.preorder) continue;
       if ((row.stock_quantity ?? 0) < qty) {
         const left = row.stock_quantity ?? 0;
         return NextResponse.json(
@@ -114,8 +118,9 @@ export async function POST(req: NextRequest) {
         const webpush = (await import("web-push")).default;
         webpush.setVapidDetails("mailto:edrickkata09@gmail.com", publicKey, privateKey);
 
+        const hasPreorder = order.items.some((i) => i.preorder);
         const payload = JSON.stringify({
-          title: `New order ${order.id}`,
+          title: `New order ${order.id}${hasPreorder ? " (pre-order)" : ""}`,
           body: `${order.customer_name} — TZS ${order.total.toLocaleString("en-TZ")} · ${order.city} · ${
             order.payment_method === "mobile-money" ? "Mobile Money" : "Cash on Delivery"
           }`,

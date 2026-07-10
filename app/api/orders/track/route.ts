@@ -26,6 +26,7 @@ interface StoredItem {
   color?: string;
   quantity?: number;
   price?: number;
+  preorder?: boolean;
 }
 
 export async function POST(req: NextRequest) {
@@ -67,6 +68,7 @@ export async function POST(req: NextRequest) {
           color: i.color,
           quantity: i.quantity ?? 1,
           price: i.price ?? 0,
+          preorder: i.preorder ?? false,
         })),
         subtotal: data.subtotal,
         delivery_fee: data.delivery_fee,

@@ -45,6 +45,8 @@ interface FormState {
   materials: string;
   care: string;
   isComingSoon: boolean;
+  preorder: boolean;
+  releaseNote: string;
   fit: string;
   fitNotes: string;
   styledWith: string[];
@@ -65,6 +67,8 @@ const DEFAULT_FORM: FormState = {
   materials: "",
   care: "",
   isComingSoon: false,
+  preorder: false,
+  releaseNote: "",
   fit: "",
   fitNotes: "",
   styledWith: [],
@@ -706,6 +710,8 @@ export default function AdminPage() {
       materials: p.materials ?? "",
       care: p.care ?? "",
       isComingSoon: p.isComingSoon ?? false,
+      preorder: p.preorder ?? false,
+      releaseNote: p.releaseNote ?? "",
       fit: p.fit ?? "",
       fitNotes: p.fitNotes ?? "",
       styledWith: p.styledWith ?? [],
@@ -746,6 +752,8 @@ export default function AdminPage() {
       materials: form.materials,
       care: form.care,
       isComingSoon: form.isComingSoon,
+      preorder: form.isComingSoon && form.preorder,
+      releaseNote: form.releaseNote,
       fit: form.fit || null,
       fitNotes: form.fitNotes,
       styledWith: form.styledWith,
@@ -1205,6 +1213,9 @@ export default function AdminPage() {
                         >
                           <td className="px-4 py-3">
                             <span className="text-xs font-mono text-white">{o.id}</span>
+                            {o.items.some((i) => i.preorder) && (
+                              <span className="ml-2 text-[8px] tracking-wider uppercase border border-sky-400/30 text-sky-400/70 px-1.5 py-0.5">Pre-Order</span>
+                            )}
                             <span className={`ml-2 inline-block text-white/25 text-[9px] transition-transform ${expandedOrder === o.id ? "rotate-90" : ""}`}>▸</span>
                           </td>
                           <td className="px-4 py-3 text-xs text-white/50 whitespace-nowrap">{formatOrderDate(o.created_at)}</td>
@@ -1242,6 +1253,9 @@ export default function AdminPage() {
                                       <div key={i} className="flex items-baseline justify-between gap-4 text-xs">
                                         <span className="text-white/70">
                                           {item.name}
+                                          {item.preorder && (
+                                            <span className="text-[8px] tracking-wider uppercase text-sky-400/70 ml-1.5">Pre-Order</span>
+                                          )}
                                           <span className="text-white/30 ml-2">
                                             {[item.color, item.size].filter(Boolean).join(" · ")} × {item.quantity}
                                           </span>
@@ -1516,7 +1530,9 @@ export default function AdminPage() {
                           )}
                         </td>
                         <td className="px-4 py-3">
-                          {p.isComingSoon ? (
+                          {p.isComingSoon && p.preorder ? (
+                            <span className="text-[9px] tracking-wider uppercase text-sky-400/70">Pre-Order</span>
+                          ) : p.isComingSoon ? (
                             <span className="text-[9px] tracking-wider uppercase text-amber-400/60">Coming Soon</span>
                           ) : (
                             <span className="text-[9px] tracking-wider uppercase text-emerald-400/60">Live</span>
@@ -1823,6 +1839,36 @@ export default function AdminPage() {
                 </label>
               </Field>
 
+              {/* Pre-orders — only meaningful for Coming Soon products */}
+              {form.isComingSoon && (
+                <div className="border border-white/10 p-4 space-y-3">
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.preorder}
+                      onChange={(e) => setForm({ ...form, preorder: e.target.checked })}
+                      className="w-3.5 h-3.5 accent-white"
+                    />
+                    <span>
+                      <span className="text-xs text-white/60 block">Accept Pre-Orders</span>
+                      <span className="text-[9px] text-white/25 block mt-0.5">Customers can buy now and receive it at release — stock limits don&apos;t apply</span>
+                    </span>
+                  </label>
+                  {form.preorder && (
+                    <Field label="Expected Release">
+                      <input
+                        type="text"
+                        value={form.releaseNote}
+                        onChange={(e) => setForm({ ...form, releaseNote: e.target.value })}
+                        placeholder="e.g. Expected late July"
+                        maxLength={80}
+                        className={inputCls}
+                      />
+                    </Field>
+                  )}
+                </div>
+              )}
+
               {/* Multi-image gallery */}
               <ImageGalleryEditor
                 adminKey={adminKey}
@@ -1912,7 +1958,7 @@ export default function AdminPage() {
                 >
                   <option value="">+ Add a product...</option>
                   {products
-                    .filter((p) => p.id !== editId && !form.styledWith.includes(p.id) && !p.isComingSoon)
+                    .filter((p) => p.id !== editId && !form.styledWith.includes(p.id) && (!p.isComingSoon || p.preorder))
                     .map((p) => (
                       <option key={p.id} value={p.id}>{p.name} ({p.category})</option>
                     ))}

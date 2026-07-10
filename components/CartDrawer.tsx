@@ -132,6 +132,11 @@ export default function CartDrawer() {
                       <p className="text-xs font-bold uppercase tracking-tight text-white leading-snug truncate">
                         {item.name}
                       </p>
+                      {item.preorder && (
+                        <p className="text-[9px] tracking-widest uppercase text-sky-300/80 mt-0.5">
+                          Pre-Order
+                        </p>
+                      )}
                       <p className="text-[10px] tracking-widest uppercase text-white/60 mt-0.5">
                         Size: {item.size}
                       </p>

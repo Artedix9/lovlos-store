@@ -376,6 +376,10 @@ export default function ProductPageClient({
 
   const heroImage = selectedColor?.image ?? product.images[0] ?? "";
 
+  const preorderable = !!product.isComingSoon && !!product.preorder;
+  /* a "teaser" is coming-soon without pre-orders — visible but not buyable */
+  const teaser = !!product.isComingSoon && !preorderable;
+
   /* undefined stock (e.g. bundled fallback data) means "don't gate" */
   const soldOut = !product.isComingSoon && product.stock !== undefined && product.stock <= 0;
   const lowStock = !product.isComingSoon && product.stock !== undefined && product.stock > 0 && product.stock <= 5;
@@ -389,7 +393,7 @@ export default function ProductPageClient({
 
   /* Sticky mobile bar appears once the main Add to Bag scrolls out of view */
   useEffect(() => {
-    if (product.isComingSoon || soldOut) return;
+    if (teaser || soldOut) return;
     const el = atcRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
@@ -398,7 +402,7 @@ export default function ProductPageClient({
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [product.isComingSoon, soldOut]);
+  }, [teaser, soldOut]);
 
   /* Log this product for the "Recently Viewed" strip */
   useEffect(() => {
@@ -453,7 +457,8 @@ export default function ProductPageClient({
       color: selectedColor?.name,
       price,
       image: heroImage,
-      maxStock: product.stock,
+      maxStock: preorderable ? undefined : product.stock,
+      preorder: preorderable || undefined,
     });
     openCart();
     showToast(
@@ -485,12 +490,12 @@ export default function ProductPageClient({
                 <div
                   key={src + i}
                   className="relative w-full shrink-0 aspect-[4/5] snap-center bg-smoke"
-                  onClick={() => !product.isComingSoon && setLightboxSrc(src)}
-                  role={product.isComingSoon ? undefined : "button"}
-                  aria-label={product.isComingSoon ? undefined : `View image ${i + 1} fullscreen`}
-                  tabIndex={product.isComingSoon ? undefined : 0}
-                  onKeyDown={(e) => !product.isComingSoon && e.key === "Enter" && setLightboxSrc(src)}
-                  style={{ cursor: product.isComingSoon ? "default" : "zoom-in" }}
+                  onClick={() => !teaser && setLightboxSrc(src)}
+                  role={teaser ? undefined : "button"}
+                  aria-label={teaser ? undefined : `View image ${i + 1} fullscreen`}
+                  tabIndex={teaser ? undefined : 0}
+                  onKeyDown={(e) => !teaser && e.key === "Enter" && setLightboxSrc(src)}
+                  style={{ cursor: teaser ? "default" : "zoom-in" }}
                 >
                   <Image
                     src={src}
@@ -500,7 +505,7 @@ export default function ProductPageClient({
                     sizes="100vw"
                     className="object-cover object-top"
                   />
-                  {product.isComingSoon && i === 0 && (
+                  {teaser && i === 0 && (
                     <div className="absolute inset-0 z-10 flex items-center justify-center bg-primary/70">
                       <p className="text-white font-bold uppercase tracking-[0.25em] text-sm">
                         Coming Soon
@@ -544,13 +549,13 @@ export default function ProductPageClient({
                   key={src + i}
                   className={[
                     "relative w-full aspect-[4/5] bg-smoke overflow-hidden",
-                    product.isComingSoon ? "cursor-default" : "cursor-zoom-in",
+                    teaser ? "cursor-default" : "cursor-zoom-in",
                   ].join(" ")}
-                  onClick={() => !product.isComingSoon && setLightboxSrc(src)}
-                  role={product.isComingSoon ? undefined : "button"}
-                  aria-label={product.isComingSoon ? undefined : `View image ${i + 1} fullscreen`}
-                  tabIndex={product.isComingSoon ? undefined : 0}
-                  onKeyDown={(e) => !product.isComingSoon && e.key === "Enter" && setLightboxSrc(src)}
+                  onClick={() => !teaser && setLightboxSrc(src)}
+                  role={teaser ? undefined : "button"}
+                  aria-label={teaser ? undefined : `View image ${i + 1} fullscreen`}
+                  tabIndex={teaser ? undefined : 0}
+                  onKeyDown={(e) => !teaser && e.key === "Enter" && setLightboxSrc(src)}
                 >
                   <Image
                     src={src}
@@ -560,10 +565,10 @@ export default function ProductPageClient({
                     sizes="50vw"
                     className={[
                       "object-cover object-top transition-transform duration-700 ease-out",
-                      product.isComingSoon ? "" : "hover:scale-105",
+                      teaser ? "" : "hover:scale-105",
                     ].join(" ")}
                   />
-                  {product.isComingSoon && i === 0 && (
+                  {teaser && i === 0 && (
                     <div className="absolute inset-0 z-10 flex items-center justify-center bg-primary/70">
                       <p className="text-white font-bold uppercase tracking-[0.25em] text-base md:text-lg">
                         Coming Soon
@@ -593,6 +598,11 @@ export default function ProductPageClient({
               {product.badge && (
                 <span className="inline-block bg-primary text-white text-[10px] tracking-widest uppercase px-2.5 py-1 mb-4 font-bold">
                   {product.badge}
+                </span>
+              )}
+              {preorderable && (
+                <span className="inline-block border border-primary text-primary text-[10px] tracking-widest uppercase px-2.5 py-1 mb-4 font-bold ml-0.5">
+                  Pre-Order
                 </span>
               )}
 
@@ -750,7 +760,7 @@ export default function ProductPageClient({
 
               {/* Add to Bag + wishlist */}
               <div className="flex items-stretch gap-2" ref={atcRef}>
-                {product.isComingSoon ? (
+                {teaser ? (
                   <button
                     disabled
                     className="flex-1 py-4 text-xs tracking-[0.2em] uppercase bg-smoke text-chicago border border-mercury cursor-not-allowed"
@@ -775,7 +785,7 @@ export default function ProductPageClient({
                         : "bg-primary text-white hover:bg-charcoal",
                     ].join(" ")}
                   >
-                    {added ? "Added to Bag ✓" : "Add to Bag"}
+                    {added ? "Added to Bag ✓" : preorderable ? "Pre-Order" : "Add to Bag"}
                   </button>
                 )}
                 <WishlistButton
@@ -788,6 +798,12 @@ export default function ProductPageClient({
                   }}
                 />
               </div>
+
+              {preorderable && (
+                <p className="mt-3 text-xs text-chicago tracking-wide text-center">
+                  {product.releaseNote ? `${product.releaseNote} · ` : ""}Pre-order now — we'll confirm delivery timing on WhatsApp.
+                </p>
+              )}
 
               {soldOut && <RestockNotifyForm productId={product.id} />}
 
@@ -919,7 +935,7 @@ export default function ProductPageClient({
       <Footer />
 
       {/* ── Sticky mobile Add to Bag — appears when the main button scrolls away ── */}
-      {!product.isComingSoon && !soldOut && (
+      {!teaser && !soldOut && (
       <div
         className={[
           "lg:hidden fixed bottom-0 inset-x-0 z-[70] bg-white border-t border-mercury",
@@ -949,7 +965,7 @@ export default function ProductPageClient({
             added ? "bg-success text-white" : "bg-primary text-white hover:bg-charcoal",
           ].join(" ")}
         >
-          {added ? "Added ✓" : "Add to Bag"}
+          {added ? "Added ✓" : preorderable ? "Pre-Order" : "Add to Bag"}
         </button>
       </div>
       )}

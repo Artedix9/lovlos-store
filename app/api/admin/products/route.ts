@@ -78,6 +78,8 @@ export async function POST(req: NextRequest) {
     materials: body.materials ?? "",
     care: body.care ?? "",
     is_coming_soon: body.isComingSoon ?? false,
+    preorder: body.preorder ?? false,
+    release_note: body.releaseNote ?? "",
     stock_quantity: Math.max(0, Number(body.stock) || 0),
     fit: body.fit || null,
     fit_notes: body.fitNotes ?? "",
@@ -121,6 +123,8 @@ export async function PUT(req: NextRequest) {
   if (body.materials !== undefined) updates.materials = body.materials;
   if (body.care !== undefined) updates.care = body.care;
   if (body.isComingSoon !== undefined) updates.is_coming_soon = body.isComingSoon;
+  if (body.preorder !== undefined) updates.preorder = body.preorder;
+  if (body.releaseNote !== undefined) updates.release_note = body.releaseNote;
   if (body.stock !== undefined) updates.stock_quantity = Math.max(0, Number(body.stock) || 0);
   if ("fit" in body) updates.fit = body.fit || null;
   if (body.fitNotes !== undefined) updates.fit_notes = body.fitNotes;

@@ -27,6 +27,7 @@ export interface Product {
   sizes?: string[];
   isComingSoon?: boolean;
   stock?: number;
+  preorder?: boolean;
 }
 
 /* Tiny 1×1 smoke-colored blur placeholder so images fade in instead of popping */
@@ -47,6 +48,9 @@ export default function ProductCard({
   const [added, setAdded] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const comingSoon = product.isComingSoon ?? false;
+  const preorderable = comingSoon && (product.preorder ?? false);
+  /* a "teaser" is coming-soon without pre-orders — visible but not buyable */
+  const teaser = comingSoon && !preorderable;
   /* undefined stock (e.g. bundled fallback data) means "don't gate" */
   const soldOut = !comingSoon && product.stock !== undefined && product.stock <= 0;
   const price = effectivePrice(product);
@@ -70,7 +74,8 @@ export default function ProductCard({
       color: selectedColor?.name,
       price,
       image: imageSrc ?? "",
-      maxStock: product.stock,
+      maxStock: preorderable ? undefined : product.stock,
+      preorder: preorderable || undefined,
     });
     showToast(
       `${product.name}${selectedColor ? ` — ${selectedColor.name}` : ""} added to bag.`
@@ -83,7 +88,7 @@ export default function ProductCard({
   function handleQuickAdd(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    if (added || comingSoon || soldOut) return;
+    if (added || teaser || soldOut) return;
     if (isOneSize) {
       quickAdd(product.sizes?.[0] ?? "One Size");
     } else {
@@ -104,21 +109,21 @@ export default function ProductCard({
           blurDataURL={BLUR_DATA}
           className={[
             "object-cover object-top transition-transform duration-700 ease-out",
-            comingSoon ? "" : "group-hover:scale-105",
+            teaser ? "" : "group-hover:scale-105",
           ].join(" ")}
         />
       ) : (
         <div
           className={[
             `absolute inset-0 bg-gradient-to-br ${product.gradient ?? "from-smoke to-mercury"}`,
-            comingSoon ? "" : "group-hover:scale-105",
+            teaser ? "" : "group-hover:scale-105",
             "transition-transform duration-700 ease-out",
           ].join(" ")}
         />
       )}
 
-      {/* Coming Soon overlay */}
-      {comingSoon && (
+      {/* Coming Soon overlay — teasers only; pre-order cards stay shoppable */}
+      {teaser && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-primary/70">
           <p className="text-white font-bold uppercase tracking-[0.25em] text-xs">
             Coming Soon
@@ -127,7 +132,7 @@ export default function ProductCard({
       )}
 
       {/* Wishlist heart */}
-      {!comingSoon && !cardLabel && (
+      {!teaser && !cardLabel && (
         <WishlistButton
           item={{
             id: product.id,
@@ -146,19 +151,24 @@ export default function ProductCard({
       )}
 
       {/* Badge — an explicit badge wins; otherwise sale products get a Sale tag */}
-      {product.badge && !comingSoon && !soldOut && !cardLabel && (
+      {product.badge && !teaser && !soldOut && !cardLabel && (
         <span className="absolute top-3 left-3 bg-primary text-white text-[9px] tracking-widest uppercase px-2 py-1 z-10 font-bold">
           {product.badge}
         </span>
       )}
-      {!product.badge && onSale && !comingSoon && !soldOut && !cardLabel && (
+      {!product.badge && !preorderable && onSale && !teaser && !soldOut && !cardLabel && (
         <span className="absolute top-3 left-3 bg-error text-white text-[9px] tracking-widest uppercase px-2 py-1 z-10 font-bold">
           Sale
         </span>
       )}
+      {!product.badge && preorderable && !cardLabel && (
+        <span className="absolute top-3 left-3 bg-primary text-white text-[9px] tracking-widest uppercase px-2 py-1 z-10 font-bold">
+          Pre-Order
+        </span>
+      )}
 
       {/* Quick Add — slides up on hover (desktop), always visible on touch */}
-      {!comingSoon && !soldOut && !hideQuickAdd && (
+      {!teaser && !soldOut && !hideQuickAdd && (
         <div
           className={[
             "absolute bottom-0 left-0 right-0 z-10",
@@ -221,7 +231,7 @@ export default function ProductCard({
                 added ? "cursor-default" : "hover:bg-charcoal",
               ].join(" ")}
             >
-              {added ? "Added to Bag ✓" : "Quick Add"}
+              {added ? "Added to Bag ✓" : preorderable ? "Pre-Order" : "Quick Add"}
             </button>
           )}
         </div>
@@ -234,7 +244,7 @@ export default function ProductCard({
       className="group flex flex-col"
       onMouseLeave={() => setPickerOpen(false)}
     >
-      {comingSoon ? (
+      {teaser ? (
         <div className="cursor-default">{imageArea}</div>
       ) : (
         <Link href={product.href}>{imageArea}</Link>
@@ -246,7 +256,7 @@ export default function ProductCard({
         </p>
       ) : (
         <div className="mt-3 flex flex-col gap-1">
-          {comingSoon ? (
+          {teaser ? (
             <p className="text-sm text-chicago leading-snug tracking-wide">{product.name}</p>
           ) : (
             <Link
@@ -256,7 +266,7 @@ export default function ProductCard({
               {product.name}
             </Link>
           )}
-          {comingSoon ? (
+          {teaser ? (
             <p className="text-sm text-chicago tracking-wide">—</p>
           ) : onSale ? (
             <p className="text-sm tracking-wide">
@@ -268,7 +278,7 @@ export default function ProductCard({
           )}
 
           {/* Color swatches */}
-          {!comingSoon && product.colors && product.colors.length > 1 && (
+          {!teaser && product.colors && product.colors.length > 1 && (
             <div className="flex gap-1 mt-1" role="group" aria-label="Colour options">
               {product.colors.map((color) => (
                 /* Outer button provides a ≥24px hit area (WCAG 2.5.8);

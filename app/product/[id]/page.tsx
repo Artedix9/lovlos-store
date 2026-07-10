@@ -22,6 +22,7 @@ function toCard(p: PDPProduct): Product {
     sizes: p.sizes,
     isComingSoon: p.isComingSoon,
     stock: p.stock,
+    preorder: p.preorder,
   };
 }
 
@@ -75,13 +76,13 @@ export default async function ProductPage(
   /* Curated "Style It With" pairings — in the admin's chosen order */
   const styledWith = (product.styledWith ?? [])
     .map((sid) => products.find((p) => p.id === sid))
-    .filter((p): p is PDPProduct => !!p && !p.isComingSoon)
+    .filter((p): p is PDPProduct => !!p && (!p.isComingSoon || !!p.preorder))
     .map(toCard);
   const styledIds = new Set(styledWith.map((p) => p.id));
 
   /* Related: same category first, then the rest of the catalog, max 4.
      Skips curated pairings so the two rows never repeat a product. */
-  const pool = products.filter((p) => p.id !== product.id && !p.isComingSoon && !styledIds.has(p.id));
+  const pool = products.filter((p) => p.id !== product.id && (!p.isComingSoon || p.preorder) && !styledIds.has(p.id));
   const related = [
     ...pool.filter((p) => p.category === product.category),
     ...pool.filter((p) => p.category !== product.category),
@@ -105,9 +106,11 @@ export default async function ProductPage(
       priceCurrency: "TZS",
       price: effectivePrice(product),
       availability:
-        (product.stock ?? 0) > 0
-          ? "https://schema.org/InStock"
-          : "https://schema.org/OutOfStock",
+        product.isComingSoon && product.preorder
+          ? "https://schema.org/PreOrder"
+          : (product.stock ?? 0) > 0
+            ? "https://schema.org/InStock"
+            : "https://schema.org/OutOfStock",
     },
     ...(reviews.length > 0
       ? {

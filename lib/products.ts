@@ -25,6 +25,13 @@ export interface PDPProduct {
   fit?: "runs-small" | "true-to-size" | "runs-large";
   fitNotes?: string;     // e.g. "Model is 175cm and wears size M"
   styledWith?: string[]; // curated product ids for "Style It With"
+  preorder?: boolean;    // Coming Soon + preorder = buyable ahead of release
+  releaseNote?: string;  // e.g. "Expected late July"
+}
+
+/** Coming Soon products with pre-orders enabled are buyable ahead of release. */
+export function isPreorderable(p: { isComingSoon?: boolean; preorder?: boolean }): boolean {
+  return !!p.isComingSoon && !!p.preorder;
 }
 
 export const PRODUCTS: PDPProduct[] = productsData as PDPProduct[];

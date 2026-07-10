@@ -8,7 +8,7 @@ export const revalidate = 3600;
 export async function GET() {
   const products = await getProducts();
   const index = products
-    .filter((p) => !p.isComingSoon)
+    .filter((p) => !p.isComingSoon || p.preorder)
     .map((p) => ({
       id: p.id,
       name: p.name,

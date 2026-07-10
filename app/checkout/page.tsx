@@ -448,6 +448,11 @@ export default function CheckoutPage() {
                       <p className="text-xs font-bold uppercase tracking-tight truncate text-primary">
                         {item.name}
                       </p>
+                      {item.preorder && (
+                        <p className="text-[9px] tracking-widest uppercase text-chicago">
+                          Pre-Order
+                        </p>
+                      )}
                       <p className="text-[10px] tracking-widest uppercase text-chicago">
                         Size: {item.size}
                       </p>
@@ -463,6 +468,13 @@ export default function CheckoutPage() {
                   </li>
                 ))}
               </ul>
+
+              {items.some((i) => i.preorder) && (
+                <p className="text-[11px] text-chicago tracking-wide border border-mercury px-3 py-2.5">
+                  Your bag includes pre-order items — they ship when released, and we&apos;ll
+                  confirm the expected timing with you on WhatsApp.
+                </p>
+              )}
 
               {/* Totals */}
               <div className="pt-4 space-y-3 border-t border-mercury">

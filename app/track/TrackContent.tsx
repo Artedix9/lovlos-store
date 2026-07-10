@@ -21,6 +21,7 @@ interface TrackedItem {
   color?: string;
   quantity: number;
   price: number;
+  preorder?: boolean;
 }
 
 interface TrackedOrder {
@@ -247,6 +248,9 @@ export default function TrackContent() {
                       <div className="min-w-0">
                         <p className="text-xs font-bold uppercase tracking-tight text-primary truncate">
                           {item.name} <span className="font-normal text-chicago">× {item.quantity}</span>
+                          {item.preorder && (
+                            <span className="ml-1.5 text-[9px] tracking-widest uppercase text-chicago border border-mercury px-1.5 py-0.5 font-normal">Pre-Order</span>
+                          )}
                         </p>
                         <p className="text-[10px] tracking-widest uppercase text-chicago mt-0.5">
                           {[item.color, item.size].filter(Boolean).join(" · ")}

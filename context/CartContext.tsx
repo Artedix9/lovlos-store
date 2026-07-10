@@ -22,6 +22,8 @@ export interface CartItem {
   image: string;
   /** Units available — quantity is capped here; undefined = uncapped */
   maxStock?: number;
+  /** Item is bought ahead of release — skips stock caps, tagged everywhere */
+  preorder?: boolean;
 }
 
 interface CartContextValue {

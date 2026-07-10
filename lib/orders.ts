@@ -35,7 +35,8 @@ export function buildWhatsAppUrl(order: SavedOrder): string {
   const itemLines = order.items
     .map((item) => {
       const variant = [item.color, item.size].filter(Boolean).join(", ");
-      return `  • ${item.name} (${variant}) x${item.quantity} — TZS ${(item.price * item.quantity).toLocaleString("en-TZ")}`;
+      const tag = item.preorder ? " [PRE-ORDER]" : "";
+      return `  • ${item.name}${tag} (${variant}) x${item.quantity} — TZS ${(item.price * item.quantity).toLocaleString("en-TZ")}`;
     })
     .join("\n");
 

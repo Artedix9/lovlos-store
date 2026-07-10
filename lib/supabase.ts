@@ -42,5 +42,7 @@ export function fromRow(row: any): PDPProduct {
     fit: row.fit ?? undefined,
     fitNotes: row.fit_notes ?? "",
     styledWith: row.styled_with ?? [],
+    preorder: row.preorder ?? false,
+    releaseNote: row.release_note ?? "",
   };
 }
