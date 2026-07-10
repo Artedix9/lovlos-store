@@ -43,12 +43,32 @@ const COLUMNS = [
 export default function Footer() {
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
-  function handleNewsletter(e: React.FormEvent<HTMLFormElement>) {
+  async function handleNewsletter(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!email.trim()) return;
-    setSubscribed(true);
-    setEmail("");
+    if (!email.trim() || submitting) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      const res = await fetch("/api/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), source: "footer" }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        setError(json?.error ?? "Something went wrong. Please try again.");
+        return;
+      }
+      setSubscribed(true);
+      setEmail("");
+    } catch {
+      setError("Connection problem — please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -74,24 +94,30 @@ export default function Footer() {
                 You&apos;re on the list. Good vibes incoming.
               </div>
             ) : (
-              <form onSubmit={handleNewsletter} className="flex w-full md:w-auto gap-0 max-w-sm">
-                <label htmlFor="footer-email" className="sr-only">Email address</label>
-                <input
-                  id="footer-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Your email address"
-                  required
-                  className="flex-1 min-w-0 bg-white/10 border border-white/20 text-white placeholder:text-white/50 text-sm px-4 py-3 outline-none focus-visible:border-white/60 transition-colors duration-200"
-                />
-                <button
-                  type="submit"
-                  className="bg-white text-primary text-xs tracking-widest uppercase px-6 py-3 hover:bg-smoke transition-colors duration-200 shrink-0 font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-                >
-                  Join
-                </button>
-              </form>
+              <div className="w-full md:w-auto max-w-sm">
+                <form onSubmit={handleNewsletter} className="flex w-full gap-0">
+                  <label htmlFor="footer-email" className="sr-only">Email address</label>
+                  <input
+                    id="footer-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); if (error) setError(""); }}
+                    placeholder="Your email address"
+                    required
+                    className="flex-1 min-w-0 bg-white/10 border border-white/20 text-white placeholder:text-white/50 text-sm px-4 py-3 outline-none focus-visible:border-white/60 transition-colors duration-200"
+                  />
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="bg-white text-primary text-xs tracking-widest uppercase px-6 py-3 hover:bg-smoke transition-colors duration-200 shrink-0 font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-60"
+                  >
+                    {submitting ? "..." : "Join"}
+                  </button>
+                </form>
+                {error && (
+                  <p role="alert" className="text-xs text-white/70 tracking-wide mt-2">{error}</p>
+                )}
+              </div>
             )}
           </div>
         </div>

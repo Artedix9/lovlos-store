@@ -20,6 +20,13 @@ interface RestockRequest {
   created_at: string;
 }
 
+interface Subscriber {
+  id: string;
+  email: string;
+  source: string;
+  created_at: string;
+}
+
 interface AdminReview {
   id: string;
   product_id: string;
@@ -544,6 +551,11 @@ export default function AdminPage() {
   const [pushDevices, setPushDevices] = useState<number | null>(null);
   const [pushError, setPushError] = useState("");
 
+  // Email subscribers
+  const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
+  const [subscriberClearing, setSubscriberClearing] = useState<string | null>(null);
+  const [copiedEmails, setCopiedEmails] = useState(false);
+
   // Announcement bar
   const [announcement, setAnnouncement] = useState("");
   const [announcementSaving, setAnnouncementSaving] = useState(false);
@@ -624,6 +636,13 @@ export default function AdminPage() {
     } catch { /* silent — editor starts blank */ }
   }, []);
 
+  const fetchSubscribers = useCallback(async (key: string) => {
+    try {
+      const res = await fetch("/api/admin/subscribers", { headers: { "x-admin-key": key } });
+      if (res.ok) setSubscribers(await res.json());
+    } catch { /* silent — list is non-critical */ }
+  }, []);
+
   const fetchProducts = useCallback(async (key: string): Promise<boolean> => {
     setLoading(true);
     try {
@@ -651,7 +670,8 @@ export default function AdminPage() {
     fetchRestock(adminKey);
     fetchReviews(adminKey);
     fetchSettings(adminKey);
-  }, [adminKey, fetchProducts, fetchHeroImages, fetchOrders, fetchRestock, fetchReviews, fetchSettings]);
+    fetchSubscribers(adminKey);
+  }, [adminKey, fetchProducts, fetchHeroImages, fetchOrders, fetchRestock, fetchReviews, fetchSettings, fetchSubscribers]);
 
   // ── Login ──────────────────────────────────────────────────────────────────
 
@@ -930,6 +950,30 @@ export default function AdminPage() {
     }
   };
 
+  // ── Email subscribers ──────────────────────────────────────────────────────
+
+  const handleRemoveSubscriber = async (id: string) => {
+    if (!adminKey) return;
+    setSubscriberClearing(id);
+    try {
+      const res = await fetch(`/api/admin/subscribers?id=${id}`, {
+        method: "DELETE",
+        headers: { "x-admin-key": adminKey },
+      });
+      if (res.ok) setSubscribers((prev) => prev.filter((s) => s.id !== id));
+    } catch { /* row stays, admin can retry */ } finally {
+      setSubscriberClearing(null);
+    }
+  };
+
+  const handleCopyEmails = async () => {
+    try {
+      await navigator.clipboard.writeText(subscribers.map((s) => s.email).join(", "));
+      setCopiedEmails(true);
+      setTimeout(() => setCopiedEmails(false), 2000);
+    } catch { /* clipboard blocked — admin can select manually */ }
+  };
+
   // ── Announcement bar save ──────────────────────────────────────────────────
 
   const handleSaveAnnouncement = async () => {
@@ -1138,10 +1182,11 @@ export default function AdminPage() {
         {activeTab === "overview" && (
           <section>
             <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-6">Orders &amp; Revenue</p>
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
               <StatCard label="Total Orders" value={orders.length} />
               <StatCard label="Pending" value={pendingOrders} sub="Awaiting payment confirmation" />
               <StatCard label="Delivered" value={deliveredOrders} />
+              <StatCard label="Email Subscribers" value={subscribers.length} sub="Footer + checkout sign-ups" />
             </div>
             <div className="border border-white/10 p-6 mb-10">
               <p className="text-[9px] tracking-[0.3em] uppercase text-white/30 mb-3">Revenue</p>
@@ -1711,6 +1756,45 @@ export default function AdminPage() {
                 </button>
               </div>
               {announcementError && <p className="text-red-400/80 text-[10px] tracking-wider mt-2">{announcementError}</p>}
+            </div>
+
+            <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-2">Email Subscribers</p>
+            <p className="text-[9px] text-white/20 mb-4">Sign-ups from the footer form and checkout opt-in. Copy the list into your email tool&apos;s BCC field to send a campaign.</p>
+            <div className="border border-white/10 p-5 mb-10">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-xs text-white/50">
+                  {subscribers.length} {subscribers.length === 1 ? "subscriber" : "subscribers"}
+                </p>
+                {subscribers.length > 0 && (
+                  <button
+                    onClick={handleCopyEmails}
+                    className="text-[9px] tracking-[0.25em] uppercase text-white/30 hover:text-white/70 transition-colors border border-white/15 hover:border-white/35 px-4 py-1.5"
+                  >
+                    {copiedEmails ? "Copied ✓" : "Copy All Emails"}
+                  </button>
+                )}
+              </div>
+              {subscribers.length === 0 ? (
+                <p className="text-[10px] text-white/20">No sign-ups yet — the footer form on every page feeds this list.</p>
+              ) : (
+                <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                  {subscribers.map((s) => (
+                    <div key={s.id} className="flex items-center gap-4 text-xs">
+                      <span className="text-white/70 flex-1 min-w-0 truncate">{s.email}</span>
+                      <span className="text-[9px] tracking-wider uppercase text-white/25 hidden sm:inline">{s.source}</span>
+                      <span className="text-white/25 whitespace-nowrap hidden md:inline">{formatOrderDate(s.created_at)}</span>
+                      <button
+                        onClick={() => handleRemoveSubscriber(s.id)}
+                        disabled={subscriberClearing === s.id}
+                        title="Remove from list"
+                        className="text-white/20 hover:text-red-400/70 transition-colors disabled:opacity-30 leading-none"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-2">Hero Banners</p>

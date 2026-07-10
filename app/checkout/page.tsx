@@ -89,6 +89,7 @@ export default function CheckoutPage() {
     payment: "mobile-money",
   });
   const [errors, setErrors] = useState<FormErrors>({});
+  const [emailOptIn, setEmailOptIn] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
@@ -193,6 +194,15 @@ export default function CheckoutPage() {
         email: form.email.trim(),
         city: form.city,
       });
+
+      /* Newsletter opt-in — fire-and-forget, never blocks the order */
+      if (emailOptIn && form.email.trim()) {
+        fetch("/api/subscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: form.email.trim(), source: "checkout" }),
+        }).catch(() => {});
+      }
 
       /* Open WhatsApp in a new tab with the full invoice message */
       window.open(buildWhatsAppUrl(order), "_blank", "noopener,noreferrer");
@@ -300,6 +310,20 @@ export default function CheckoutPage() {
                       className={inputCls(errors.email)}
                     />
                   </Field>
+
+                  {form.email.trim() !== "" && (
+                    <label className="flex items-start gap-2.5 cursor-pointer -mt-2">
+                      <input
+                        type="checkbox"
+                        checked={emailOptIn}
+                        onChange={(e) => setEmailOptIn(e.target.checked)}
+                        className="mt-0.5 w-3.5 h-3.5 accent-primary"
+                      />
+                      <span className="text-[11px] text-chicago tracking-wide leading-relaxed">
+                        Email me about new drops, restocks &amp; sales
+                      </span>
+                    </label>
+                  )}
 
                   <Field id="checkout-city" label="City / Delivery Area">
                     <div className="relative">
