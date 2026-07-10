@@ -54,5 +54,5 @@ export function buildWhatsAppUrl(order: SavedOrder): string {
     `Name: Edrick Neckemia Katabarula\n\n` +
     `Please send the transaction screenshot here to confirm your order.`;
 
-  return `https://wa.me/255746704036?text=${encodeURIComponent(message)}`;
+  return `https://wa.me/255692928552?text=${encodeURIComponent(message)}`;
 }

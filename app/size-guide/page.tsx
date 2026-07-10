@@ -35,12 +35,12 @@ export default function SizeGuidePage() {
         <p className="text-chicago">
           Still unsure? WhatsApp us at{" "}
           <a
-            href="https://wa.me/255746704036"
+            href="https://wa.me/255692928552"
             target="_blank"
             rel="noopener noreferrer"
             className="text-primary underline underline-offset-2 hover:text-chicago transition-colors duration-200"
           >
-            +255 746 704 036
+            +255 692 928 552
           </a>{" "}
           and we&apos;ll help you choose.
         </p>

@@ -103,7 +103,7 @@ export default function SizeGuideModal({
             </ul>
             <p className="mt-5 text-xs text-chicago tracking-wide leading-relaxed">
               Between sizes? We recommend sizing up for a relaxed fit. Still unsure?
-              WhatsApp us at +255 746 704 036 and we&apos;ll help you choose.
+              WhatsApp us at +255 692 928 552 and we&apos;ll help you choose.
             </p>
           </div>
         </div>

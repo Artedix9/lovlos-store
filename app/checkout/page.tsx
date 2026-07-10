@@ -115,7 +115,7 @@ export default function CheckoutPage() {
     if (!form.phone.trim()) {
       next.phone = "Phone number is required.";
     } else if (!/^(\+255|0)[67]\d{8}$/.test(form.phone.replace(/\s/g, ""))) {
-      next.phone = "Enter a valid Tanzanian number (e.g. 0746 704 036).";
+      next.phone = "Enter a valid Tanzanian number (e.g. 0692 928 552).";
     }
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
       next.email = "Enter a valid email address.";
@@ -279,7 +279,7 @@ export default function CheckoutPage() {
                       value={form.phone}
                       onChange={handleChange}
                       autoComplete="tel"
-                      placeholder="+255 746 704 036"
+                      placeholder="+255 692 928 552"
                       aria-invalid={errors.phone ? true : undefined}
                       aria-describedby={errors.phone ? "checkout-phone-error" : undefined}
                       className={inputCls(errors.phone)}

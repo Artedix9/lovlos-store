@@ -7,7 +7,7 @@ import Image from "next/image";
 import { formatTZS } from "@/lib/products";
 
 const WHATSAPP_LINK =
-  "https://wa.me/255746704036?text=Hi%20LOVLOS!%20I%20just%20placed%20an%20order.%20Here%20is%20my%20payment%20confirmation%20screenshot.";
+  "https://wa.me/255692928552?text=Hi%20LOVLOS!%20I%20just%20placed%20an%20order.%20Here%20is%20my%20payment%20confirmation%20screenshot.";
 
 /* ── Inner component (reads searchParams) ── */
 function SuccessContent() {
@@ -174,7 +174,7 @@ function SuccessContent() {
           </div>
 
           <p className="text-[10px] tracking-widest uppercase text-chicago">
-            Questions? WhatsApp us at +255 746 704 036
+            Questions? WhatsApp us at +255 692 928 552
           </p>
         </div>
       </div>

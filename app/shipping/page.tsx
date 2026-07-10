@@ -53,12 +53,12 @@ export default function ShippingPage() {
           <li>
             To start a return or exchange, message us on WhatsApp at{" "}
             <a
-              href="https://wa.me/255746704036"
+              href="https://wa.me/255692928552"
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary underline underline-offset-2 hover:text-chicago transition-colors duration-200"
             >
-              +255 746 704 036
+              +255 692 928 552
             </a>{" "}
             with your order ID (e.g. LVL-XXXXXX) and the reason.
           </li>

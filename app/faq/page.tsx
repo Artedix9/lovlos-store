@@ -98,7 +98,7 @@ export default function FAQPage() {
     <InfoPage
       eyebrow="Support"
       title="FAQ"
-      intro="Quick answers to the questions we hear most. Can't find yours? WhatsApp us at +255 746 704 036."
+      intro="Quick answers to the questions we hear most. Can't find yours? WhatsApp us at +255 692 928 552."
     >
       <div className="divide-y divide-mercury border-y border-mercury">
         {FAQS.map((item) => (

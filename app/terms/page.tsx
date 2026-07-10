@@ -68,12 +68,12 @@ export default function TermsPage() {
         <p>
           Questions about these terms? WhatsApp us at{" "}
           <a
-            href="https://wa.me/255746704036"
+            href="https://wa.me/255692928552"
             target="_blank"
             rel="noopener noreferrer"
             className="text-primary underline underline-offset-2 hover:text-chicago transition-colors duration-200"
           >
-            +255 746 704 036
+            +255 692 928 552
           </a>
           .
         </p>

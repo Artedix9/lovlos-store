@@ -117,7 +117,7 @@ export default function TrackContent() {
                 type="tel"
                 value={phone}
                 onChange={(e) => { setPhone(e.target.value); setError(null); }}
-                placeholder="+255 746 704 036"
+                placeholder="+255 692 928 552"
                 autoComplete="tel"
                 className="w-full bg-white border border-primary text-sm text-primary px-4 py-3.5 outline-none placeholder:text-chicago tracking-wide focus:border-mine focus:ring-2 focus:ring-primary/10 transition-all duration-200"
               />
@@ -165,12 +165,12 @@ export default function TrackContent() {
                   <p className="text-sm text-mine tracking-wide leading-relaxed">
                     This order was cancelled. If that doesn&apos;t look right, message us on WhatsApp at{" "}
                     <a
-                      href="https://wa.me/255746704036"
+                      href="https://wa.me/255692928552"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-primary underline underline-offset-2"
                     >
-                      +255 746 704 036
+                      +255 692 928 552
                     </a>{" "}
                     and we&apos;ll sort it out.
                   </p>
@@ -279,12 +279,12 @@ export default function TrackContent() {
               <p className="text-xs text-chicago tracking-wide leading-relaxed">
                 Questions about this order? WhatsApp us at{" "}
                 <a
-                  href={`https://wa.me/255746704036?text=${encodeURIComponent(`Hi LOVLOS! I have a question about my order ${order.id}.`)}`}
+                  href={`https://wa.me/255692928552?text=${encodeURIComponent(`Hi LOVLOS! I have a question about my order ${order.id}.`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-primary underline underline-offset-2 hover:text-chicago transition-colors duration-200"
                 >
-                  +255 746 704 036
+                  +255 692 928 552
                 </a>{" "}
                 — include your order ID.
               </p>

@@ -10,7 +10,7 @@ import { getSupabase } from "@/lib/supabase";
  */
 
 /** Tanzanian numbers share their last 9 digits across formats
-    (0746 704 036 vs +255 746 704 036) — compare on that. */
+    (0692 928 552 vs +255 692 928 552) — compare on that. */
 function lastNine(phone: string): string {
   return phone.replace(/\D/g, "").slice(-9);
 }

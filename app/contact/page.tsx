@@ -25,9 +25,9 @@ export default function ContactPage() {
         <p className="text-[10px] font-bold tracking-ultra uppercase text-white/70">
           WhatsApp — fastest response
         </p>
-        <p className="text-2xl font-black text-white tracking-tight">+255 746 704 036</p>
+        <p className="text-2xl font-black text-white tracking-tight">+255 692 928 552</p>
         <a
-          href="https://wa.me/255746704036?text=Hi%20LOVLOS!%20I%20have%20a%20question."
+          href="https://wa.me/255692928552?text=Hi%20LOVLOS!%20I%20have%20a%20question."
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center justify-center gap-3 bg-white text-primary text-xs font-black tracking-ultra uppercase py-4 px-8 hover:bg-smoke transition-colors duration-200"
