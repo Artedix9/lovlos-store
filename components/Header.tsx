@@ -120,6 +120,7 @@ const NAV_LEFT = [
   { label: "Women", href: "/women" },
   { label: "Men", href: "/men" },
   { label: "Accessories", href: "/accessories" },
+  { label: "Sale", href: "/sale" },
 ];
 
 const NAV_RIGHT = [
@@ -131,6 +132,7 @@ const MOBILE_NAV = [
   { label: "Women", href: "/women" },
   { label: "Men", href: "/men" },
   { label: "Accessories", href: "/accessories" },
+  { label: "Sale", href: "/sale" },
   { label: "Wishlist", href: "/wishlist" },
   { label: "My Orders", href: "/orders" },
   { label: "About", href: "/about" },

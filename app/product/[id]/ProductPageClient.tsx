@@ -414,10 +414,17 @@ export default function ProductPageClient({
     });
   }, [product]);
 
-  const sortedImages = useMemo(
-    () => [heroImage, ...product.images.filter((src) => src !== heroImage)],
-    [heroImage, product.images]
-  );
+  const sortedImages = useMemo(() => {
+    /* A color with its own gallery replaces the shared images entirely, so
+       picking "Black" never shows another color's photos. Colors without a
+       gallery keep the old behavior: their hero + the shared images. */
+    const colorGallery = (selectedColor?.images ?? []).filter(Boolean);
+    if (colorGallery.length > 0) {
+      const hero = selectedColor?.image;
+      return hero ? [hero, ...colorGallery.filter((src) => src !== hero)] : colorGallery;
+    }
+    return [heroImage, ...product.images.filter((src) => src !== heroImage)];
+  }, [selectedColor, heroImage, product.images]);
 
   /* Sync carousel to active slide on color change */
   useEffect(() => {
@@ -542,41 +549,112 @@ export default function ProductPageClient({
               </div>
             )}
 
-            {/* Desktop: vertical stack */}
-            <div className="hidden lg:flex flex-col gap-1">
-              {sortedImages.map((src, i) => (
-                <div
-                  key={src + i}
-                  className={[
-                    "relative w-full aspect-[4/5] bg-smoke overflow-hidden",
-                    teaser ? "cursor-default" : "cursor-zoom-in",
-                  ].join(" ")}
-                  onClick={() => !teaser && setLightboxSrc(src)}
-                  role={teaser ? undefined : "button"}
-                  aria-label={teaser ? undefined : `View image ${i + 1} fullscreen`}
-                  tabIndex={teaser ? undefined : 0}
-                  onKeyDown={(e) => !teaser && e.key === "Enter" && setLightboxSrc(src)}
-                >
-                  <Image
-                    src={src}
-                    alt={`${product.name} — view ${i + 1}`}
-                    fill
-                    priority={i === 0}
-                    sizes="50vw"
-                    className={[
-                      "object-cover object-top transition-transform duration-700 ease-out",
-                      teaser ? "" : "hover:scale-105",
-                    ].join(" ")}
-                  />
-                  {teaser && i === 0 && (
-                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-primary/70">
-                      <p className="text-white font-bold uppercase tracking-[0.25em] text-base md:text-lg">
-                        Coming Soon
-                      </p>
-                    </div>
-                  )}
+            {/* Desktop: thumbnail rail + single main image with prev/next arrows */}
+            <div
+              className="hidden lg:flex gap-4 items-start px-6 pt-6 lg:sticky lg:self-start"
+              style={{ top: "var(--shell-top)" }}
+              role="group"
+              aria-label="Product images"
+            >
+              {/* Thumbnail rail — hover or click to switch the main image */}
+              {sortedImages.length > 1 && (
+                <div className="flex flex-col gap-2 w-14 shrink-0">
+                  {sortedImages.map((src, i) => (
+                    <button
+                      key={src + i}
+                      type="button"
+                      onMouseEnter={() => setActiveSlide(i)}
+                      onFocus={() => setActiveSlide(i)}
+                      onClick={() => setActiveSlide(i)}
+                      aria-label={`Show image ${i + 1}`}
+                      aria-current={i === activeSlide ? "true" : undefined}
+                      className={[
+                        "relative w-14 aspect-[4/5] bg-smoke overflow-hidden transition-opacity duration-150",
+                        i === activeSlide
+                          ? "ring-1 ring-primary"
+                          : "opacity-70 hover:opacity-100",
+                      ].join(" ")}
+                    >
+                      <Image
+                        src={src}
+                        alt=""
+                        fill
+                        sizes="56px"
+                        className="object-cover object-top"
+                      />
+                    </button>
+                  ))}
                 </div>
-              ))}
+              )}
+
+              {/* Main image — height-capped to the viewport so the arrows and
+                  full frame always stay visible; width follows the 4:5 ratio */}
+              <div
+                className={[
+                  "relative aspect-[4/5] h-[calc(100vh-var(--shell-top)-3.5rem)] max-w-full bg-smoke overflow-hidden",
+                  teaser ? "cursor-default" : "cursor-zoom-in",
+                ].join(" ")}
+                onClick={() => !teaser && setLightboxSrc(sortedImages[activeSlide] ?? sortedImages[0])}
+                role={teaser ? undefined : "button"}
+                aria-label={teaser ? undefined : "View image fullscreen"}
+                tabIndex={teaser ? undefined : 0}
+                onKeyDown={(e) => {
+                  if (teaser) return;
+                  const n = sortedImages.length;
+                  if (e.key === "Enter") setLightboxSrc(sortedImages[activeSlide] ?? sortedImages[0]);
+                  if (e.key === "ArrowLeft" && n > 1) setActiveSlide((activeSlide - 1 + n) % n);
+                  if (e.key === "ArrowRight" && n > 1) setActiveSlide((activeSlide + 1) % n);
+                }}
+              >
+                <Image
+                  key={sortedImages[activeSlide] ?? sortedImages[0]}
+                  src={sortedImages[activeSlide] ?? sortedImages[0]}
+                  alt={`${product.name} — view ${activeSlide + 1} of ${sortedImages.length}`}
+                  fill
+                  priority
+                  sizes="45vw"
+                  className="object-cover object-top"
+                />
+
+                {teaser && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-primary/70">
+                    <p className="text-white font-bold uppercase tracking-[0.25em] text-base md:text-lg">
+                      Coming Soon
+                    </p>
+                  </div>
+                )}
+
+                {/* Prev / next — circular buttons, bottom-right, Nike-style */}
+                {sortedImages.length > 1 && !teaser && (
+                  <div className="absolute bottom-4 right-4 z-10 flex gap-2">
+                    {[
+                      { dir: -1, label: "Previous image", points: "15 18 9 12 15 6" },
+                      { dir: 1, label: "Next image", points: "9 18 15 12 9 6" },
+                    ].map(({ dir, label, points }) => (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveSlide(
+                            (activeSlide + dir + sortedImages.length) % sortedImages.length
+                          );
+                        }}
+                        aria-label={label}
+                        className="w-9 h-9 rounded-full bg-white/90 text-primary flex items-center justify-center shadow-sm hover:bg-white transition-colors duration-150"
+                      >
+                        <svg
+                          width="15" height="15" viewBox="0 0 24 24" fill="none"
+                          stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"
+                          strokeLinejoin="round" aria-hidden="true"
+                        >
+                          <polyline points={points} />
+                        </svg>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

@@ -134,3 +134,44 @@
     @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary;
   }
 }
+
+/* ── Admin dashboard theming ──────────────────────────────────────────────
+   The admin UI colors run through these variables (--adm-fg is an RGB
+   triple used inside rgb(...)/alpha arbitrary values). Toggled from the
+   dashboard header; preference persists in localStorage. */
+.adm-dark {
+  --adm-bg: #0a0a0a;
+  --adm-bg2: #111111;
+  --adm-fg: 255 255 255;
+  --adm-amber: 251 191 36;
+  --adm-emerald: 52 211 153;
+  --adm-red: 248 113 113;
+  --adm-sky: 56 189 248;
+  --adm-violet: 167 139 250;
+  color-scheme: dark;
+  /* Opacity scale — lifted from the original design's very faint values so
+     labels, hints, and borders stay legible while keeping the hierarchy */
+  --adm-a01: 0.02;  --adm-a015: 0.03;  --adm-a04: 0.07; --adm-a05: 0.08;
+  --adm-a06: 0.09;  --adm-a08: 0.12;   --adm-a10: 0.15; --adm-a15: 0.22;
+  --adm-a20: 0.35;  --adm-a25: 0.42;   --adm-a30: 0.48; --adm-a35: 0.52;
+  --adm-a40: 0.58;  --adm-a50: 0.65;   --adm-a60: 0.72; --adm-a70: 0.80;
+  --adm-a80: 0.87;  --adm-a90: 0.93;
+}
+.adm-light {
+  --adm-bg: #f6f6f4;
+  --adm-bg2: #ffffff;
+  --adm-fg: 17 17 17;
+  --adm-amber: 180 83 9;
+  --adm-emerald: 4 120 87;
+  --adm-red: 220 38 38;
+  --adm-sky: 3 105 161;
+  --adm-violet: 109 40 217;
+  color-scheme: light;
+  /* Opacity scale boosted — faint black vanishes on white, so the low/mid
+     steps (labels, hints, borders) get considerably more ink */
+  --adm-a01: 0.02;  --adm-a015: 0.03;  --adm-a04: 0.08; --adm-a05: 0.09;
+  --adm-a06: 0.10;  --adm-a08: 0.14;   --adm-a10: 0.18; --adm-a15: 0.30;
+  --adm-a20: 0.48;  --adm-a25: 0.55;   --adm-a30: 0.60; --adm-a35: 0.62;
+  --adm-a40: 0.68;  --adm-a50: 0.74;   --adm-a60: 0.78; --adm-a70: 0.84;
+  --adm-a80: 0.88;  --adm-a90: 0.94;
+}

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { OrderPayload, SavedOrder } from "@/lib/orders";
+import { checkPromo, normalizePromoCode, type PromoCode } from "@/lib/promo";
+import { deliveryFeeFor } from "@/lib/delivery";
 
 /**
  * POST /api/orders
@@ -86,6 +88,44 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    /* Promo — re-validated here so the client-side discount is never trusted.
+       The total is recomputed from the subtotal + server-side discount. */
+    let promoCode: string | null = null;
+    let discount = 0;
+    if (order.promo_code) {
+      const code = normalizePromoCode(order.promo_code);
+      const { data: promoRow, error: promoError } = await supabase
+        .from("promo_codes")
+        .select("*")
+        .eq("code", code)
+        .maybeSingle();
+      if (promoError) throw promoError;
+      const result = checkPromo(
+        (promoRow as PromoCode | null) ?? null,
+        order.subtotal,
+        deliveryFeeFor(order.subtotal)
+      );
+      if (!result.ok) {
+        return NextResponse.json(
+          { error: `${result.reason} Remove the code and try again.` },
+          { status: 409 }
+        );
+      }
+      promoCode = code;
+      discount = result.discount;
+      order.promo_code = code;
+      order.discount = discount;
+      order.total = order.subtotal - discount + order.delivery_fee;
+    }
+
+    /* Snapshot each item's buying cost for profit reporting. Stored only —
+       the response below returns the client's items, so cost never reaches
+       the customer's browser. */
+    const itemsWithCost = order.items.map((item) => ({
+      ...item,
+      cost: (stockRows ?? []).find((r) => r.id === item.id)?.cost_price ?? null,
+    }));
+
     const { error } = await supabase.from("orders").insert({
       id:             order.id,
       customer_name:  order.customer_name,
@@ -94,15 +134,26 @@ export async function POST(req: NextRequest) {
       city:           order.city,
       delivery_note:  order.delivery_note,
       payment_method: order.payment_method,
-      items:          order.items,
+      items:          itemsWithCost,
       subtotal:       order.subtotal,
       delivery_fee:   order.delivery_fee,
       total:          order.total,
       status:         order.status,
+      /* Promo columns only when a promo applies — keeps regular checkouts
+         working until supabase/promo-codes.sql has been run */
+      ...(promoCode ? { promo_code: promoCode, discount } : {}),
     });
     if (error) {
       console.error("SUPABASE_ERROR_DETAIL:", error);
       throw error;
+    }
+
+    /* Count the redemption. Never blocks the order — worst case a code is
+       used slightly past its limit, which manual confirmation absorbs.
+       (Cancelling the order later releases the redemption again.) */
+    if (promoCode) {
+      const { error: useError } = await supabase.rpc("adjust_promo_use", { p_code: promoCode, p_delta: 1 });
+      if (useError) console.error("[LOVLOS PROMO USE ERROR]", useError);
     }
 
     /* Alert the admin's subscribed devices. Never blocks the order. */

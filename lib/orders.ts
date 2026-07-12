@@ -12,12 +12,22 @@ export interface OrderPayload {
   subtotal: number;
   delivery_fee: number;
   total: number;
+  promo_code?: string | null;
+  discount?: number;
+}
+
+/** Item as stored on an order row — the server snapshots the buying cost at
+ *  sale time so profit reports survive later cost changes. Admin-only: the
+ *  customer-facing order/track responses never include `cost`. */
+export interface OrderItem extends CartItem {
+  cost?: number | null;
 }
 
 export interface SavedOrder extends OrderPayload {
   id: string;
   status: "pending" | "confirmed" | "dispatched" | "delivered" | "cancelled";
   created_at: string;
+  items: OrderItem[];
 }
 
 /** Generate a short human-readable order ID: LVL-XXXXXX */
@@ -47,6 +57,9 @@ export function buildWhatsAppUrl(order: SavedOrder): string {
     `Phone: ${order.phone}\n` +
     `Delivery: ${order.city}${order.delivery_note ? ` — ${order.delivery_note}` : ""}\n\n` +
     `Items:\n${itemLines}\n\n` +
+    (order.promo_code && (order.discount ?? 0) > 0
+      ? `Promo: ${order.promo_code} (−TZS ${(order.discount ?? 0).toLocaleString("en-TZ")})\n`
+      : "") +
     `Total: TZS ${order.total.toLocaleString("en-TZ")}\n\n` +
     `PAYMENT DETAILS:\n` +
     `Method: Selcom Lipa Namba\n` +

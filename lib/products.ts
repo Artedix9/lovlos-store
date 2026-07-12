@@ -3,7 +3,8 @@ import productsData from "@/data/products.json";
 export interface ProductColor {
   name: string;
   hex: string;
-  image?: string;
+  image?: string;    // primary photo — swatch/card/cart thumbnail and gallery hero
+  images?: string[]; // optional per-color gallery; when set, the PDP shows these instead of the shared images
 }
 
 export interface PDPProduct {
@@ -13,6 +14,7 @@ export interface PDPProduct {
   categoryHref: string;
   price: number;         // TZS
   salePrice?: number;    // TZS — when set, shown against a struck-through price
+  costPrice?: number;    // TZS buying price — populated ONLY by the admin API, never public routes
   badge?: string;
   images: string[];      // ordered: hero first
   colors?: ProductColor[];

@@ -17,6 +17,7 @@ const COLUMNS = [
       { label: "Women", href: "/women" },
       { label: "Men", href: "/men" },
       { label: "Accessories", href: "/accessories" },
+      { label: "Sale", href: "/sale" },
     ],
   },
   {
@@ -43,6 +44,7 @@ const COLUMNS = [
 export default function Footer() {
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
+  const [welcome, setWelcome] = useState<{ code: string; label: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -57,12 +59,13 @@ export default function Footer() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim(), source: "footer" }),
       });
+      const json = await res.json().catch(() => null);
       if (!res.ok) {
-        const json = await res.json().catch(() => null);
         setError(json?.error ?? "Something went wrong. Please try again.");
         return;
       }
       setSubscribed(true);
+      setWelcome(json?.welcome ?? null);
       setEmail("");
     } catch {
       setError("Connection problem — please try again.");
@@ -86,12 +89,23 @@ export default function Footer() {
           {/* Persistent live region so the subscribe confirmation is announced */}
           <div aria-live="polite">
             {subscribed ? (
-              <div role="status" className="flex items-center gap-3 text-sm text-white/80 tracking-wide">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                You&apos;re on the list. Good vibes incoming.
+              <div role="status" className="text-sm text-white/80 tracking-wide">
+                <div className="flex items-center gap-3">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  You&apos;re on the list. Good vibes incoming.
+                </div>
+                {welcome && (
+                  <p className="mt-2 text-xs tracking-widest uppercase text-white/70">
+                    Welcome gift: use code{" "}
+                    <span className="font-bold text-white border border-white/40 px-2 py-0.5 select-all">
+                      {welcome.code}
+                    </span>{" "}
+                    at checkout for {welcome.label.toLowerCase()}
+                  </p>
+                )}
               </div>
             ) : (
               <div className="w-full md:w-auto max-w-sm">

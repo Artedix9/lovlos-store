@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -12,6 +12,10 @@ import { buildWhatsAppUrl, generateOrderId } from "@/lib/orders";
 import type { OrderPayload, SavedOrder } from "@/lib/orders";
 import { deliveryFeeFor } from "@/lib/delivery";
 import { recordOrder, getCheckoutProfile, saveCheckoutProfile } from "@/lib/orderHistory";
+import { promoDiscountFor, promoLabel, type PromoCode } from "@/lib/promo";
+import { getStoredPromo, clearStoredPromo } from "@/lib/promoStorage";
+
+type AppliedPromo = Pick<PromoCode, "code" | "discount_type" | "discount_value" | "min_subtotal">;
 
 const CITIES = [
   "Dar es Salaam",
@@ -93,6 +97,12 @@ export default function CheckoutPage() {
   const [placing, setPlacing] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
+  // Promo code
+  const [promoInput, setPromoInput] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [promoChecking, setPromoChecking] = useState(false);
+
   /* Returning customers: prefill from the last order's details */
   useEffect(() => {
     const profile = getCheckoutProfile();
@@ -108,7 +118,63 @@ export default function CheckoutPage() {
   }, []);
 
   const deliveryFee = deliveryFeeFor(subtotal);
-  const total = subtotal + deliveryFee;
+  const discount =
+    appliedPromo && subtotal >= appliedPromo.min_subtotal
+      ? promoDiscountFor(appliedPromo, subtotal, deliveryFee)
+      : 0;
+  const total = subtotal - discount + deliveryFee;
+
+  const applyCode = useCallback(
+    async (rawCode: string, opts: { silent?: boolean } = {}) => {
+      const code = rawCode.trim();
+      if (!code) return;
+      setPromoChecking(true);
+      setPromoError(null);
+      try {
+        const res = await fetch("/api/promo/validate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, subtotal }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error ?? "That promo code isn't valid.");
+        }
+        setAppliedPromo(data.promo as AppliedPromo);
+        setPromoInput("");
+      } catch (err) {
+        clearStoredPromo();
+        if (!opts.silent) {
+          setPromoError(err instanceof Error ? err.message : "That promo code isn't valid.");
+        }
+      } finally {
+        setPromoChecking(false);
+      }
+    },
+    [subtotal]
+  );
+
+  /* Campaign links (?promo=CODE anywhere on the site) stash the code in
+     sessionStorage; apply it automatically once the bag is known. */
+  const autoApplyTried = useRef(false);
+  useEffect(() => {
+    if (autoApplyTried.current || appliedPromo || subtotal <= 0) return;
+    const stored = getStoredPromo();
+    if (!stored) return;
+    autoApplyTried.current = true;
+    applyCode(stored);
+  }, [subtotal, appliedPromo, applyCode]);
+
+  function handleApplyPromo() {
+    if (promoChecking) return;
+    applyCode(promoInput);
+  }
+
+  function handleRemovePromo() {
+    setAppliedPromo(null);
+    setPromoError(null);
+    clearStoredPromo();
+  }
 
   function validate(): FormErrors {
     const next: FormErrors = {};
@@ -164,6 +230,8 @@ export default function CheckoutPage() {
       subtotal,
       delivery_fee: deliveryFee,
       total,
+      promo_code: discount > 0 && appliedPromo ? appliedPromo.code : null,
+      discount,
     };
 
     try {
@@ -209,6 +277,7 @@ export default function CheckoutPage() {
 
       clearCart();
       closeCart();
+      clearStoredPromo();
 
       router.push(
         `/success?total=${total}&payment=${form.payment}&region=${encodeURIComponent(form.city)}&orderId=${order.id}`
@@ -500,12 +569,83 @@ export default function CheckoutPage() {
                 </p>
               )}
 
+              {/* Promo code */}
+              <div className="py-4 border-t border-mercury">
+                {appliedPromo ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs tracking-wide text-primary">
+                      <span className="font-bold uppercase tracking-widest">{appliedPromo.code}</span>
+                      <span className="text-chicago ml-2">{promoLabel(appliedPromo)}</span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleRemovePromo}
+                      className="text-[10px] tracking-widest uppercase text-chicago hover:text-primary underline underline-offset-2 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={promoInput}
+                      onChange={(e) => {
+                        setPromoInput(e.target.value.toUpperCase());
+                        if (promoError) setPromoError(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleApplyPromo();
+                        }
+                      }}
+                      placeholder="Promo code"
+                      aria-label="Promo code"
+                      autoComplete="off"
+                      spellCheck={false}
+                      className="flex-1 min-w-0 bg-white border border-primary text-sm text-primary px-4 py-3 outline-none focus:border-mine focus:ring-2 focus:ring-primary/10 transition-all duration-200 placeholder:text-chicago tracking-widest uppercase"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyPromo}
+                      disabled={promoChecking || !promoInput.trim()}
+                      className="btn-outline text-[10px] px-5 py-3 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {promoChecking ? "…" : "Apply"}
+                    </button>
+                  </div>
+                )}
+                {promoError && (
+                  <p role="alert" className="text-[11px] text-error tracking-wide mt-2">
+                    {promoError}
+                  </p>
+                )}
+                {appliedPromo && discount === 0 && (
+                  <p className="text-[11px] text-chicago tracking-wide mt-2">
+                    {subtotal < appliedPromo.min_subtotal
+                      ? `This code needs a minimum order of ${formatTZS(appliedPromo.min_subtotal)}.`
+                      : "Delivery is already free on this order."}
+                  </p>
+                )}
+              </div>
+
               {/* Totals */}
               <div className="pt-4 space-y-3 border-t border-mercury">
                 <div className="flex justify-between text-sm">
                   <span className="text-chicago tracking-wide">Subtotal</span>
                   <span className="text-mine">{formatTZS(subtotal)}</span>
                 </div>
+                {discount > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-chicago tracking-wide">
+                      Discount{appliedPromo ? ` (${appliedPromo.code})` : ""}
+                    </span>
+                    <span className="text-success font-bold tracking-wide">
+                      −{formatTZS(discount)}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm">
                   <span className="text-chicago tracking-wide">Delivery</span>
                   <span className="text-mine">

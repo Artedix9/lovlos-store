@@ -8,6 +8,7 @@ function revalidateAll(productId?: string) {
   revalidatePath("/men");
   revalidatePath("/women");
   revalidatePath("/accessories");
+  revalidatePath("/sale");
   // Stock/price edits must show on the product page immediately, not after
   // the hourly ISR window — e.g. restock alerts link customers straight here.
   if (productId) revalidatePath(`/product/${productId}`);
@@ -18,6 +19,20 @@ function parseSalePrice(raw: unknown, regularPrice: number): number | null | und
   if (raw === undefined || raw === null || raw === "") return null;
   const n = Number(raw);
   if (!Number.isFinite(n) || n <= 0 || n >= regularPrice) return undefined; // invalid
+  return Math.round(n);
+}
+
+/** Buying price — admin-only, so fromRow never carries it. Attach here. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function adminRow(row: any) {
+  return { ...fromRow(row), costPrice: row.cost_price ?? undefined };
+}
+
+/** null = not recorded; otherwise a non-negative amount. */
+function parseCostPrice(raw: unknown): number | null | undefined {
+  if (raw === undefined || raw === null || raw === "") return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return undefined; // invalid
   return Math.round(n);
 }
 
@@ -37,7 +52,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await getSupabase().from("products").select("*").order("sort_order");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json((data ?? []).map(fromRow));
+  return NextResponse.json((data ?? []).map(adminRow));
 }
 
 export async function POST(req: NextRequest) {
@@ -52,6 +67,11 @@ export async function POST(req: NextRequest) {
   const salePrice = parseSalePrice(body.salePrice, Number(body.price));
   if (salePrice === undefined) {
     return NextResponse.json({ error: "Sale price must be lower than the regular price" }, { status: 400 });
+  }
+
+  const costPrice = parseCostPrice(body.costPrice);
+  if (costPrice === undefined) {
+    return NextResponse.json({ error: "Buying price must be zero or a positive number" }, { status: 400 });
   }
 
   const db = getSupabase();
@@ -70,6 +90,7 @@ export async function POST(req: NextRequest) {
     category_href: `/${(body.category as string).toLowerCase()}`,
     price: Number(body.price),
     sale_price: salePrice,
+    cost_price: costPrice,
     badge: body.badge || null,
     images: body.images ?? [],
     colors: body.colors ?? [],
@@ -90,7 +111,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await db.from("products").insert(row).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   revalidateAll(row.id);
-  return NextResponse.json(fromRow(data), { status: 201 });
+  return NextResponse.json(adminRow(data), { status: 201 });
 }
 
 export async function PUT(req: NextRequest) {
@@ -114,6 +135,13 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Sale price must be lower than the regular price" }, { status: 400 });
     }
     updates.sale_price = salePrice;
+  }
+  if ("costPrice" in body) {
+    const costPrice = parseCostPrice(body.costPrice);
+    if (costPrice === undefined) {
+      return NextResponse.json({ error: "Buying price must be zero or a positive number" }, { status: 400 });
+    }
+    updates.cost_price = costPrice;
   }
   if ("badge" in body) updates.badge = body.badge || null;
   if (body.images !== undefined) updates.images = body.images;
@@ -139,7 +167,7 @@ export async function PUT(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   revalidateAll(body.id);
-  return NextResponse.json(fromRow(data));
+  return NextResponse.json(adminRow(data));
 }
 
 export async function DELETE(req: NextRequest) {
@@ -167,9 +195,11 @@ export async function DELETE(req: NextRequest) {
       db.from("restock_requests").delete().eq("product_id", id),
     ]);
 
+    const colors = (product?.colors ?? []) as { image?: string; images?: string[] }[];
     const urls: string[] = [
       ...(product?.images ?? []),
-      ...((product?.colors ?? []) as { image?: string }[]).map((c) => c.image ?? ""),
+      ...colors.map((c) => c.image ?? ""),
+      ...colors.flatMap((c) => c.images ?? []),
       ...(productReviews ?? []).map((r) => r.photo_url ?? ""),
     ];
     const paths = urls.map(storagePathFromUrl).filter((p): p is string => !!p);

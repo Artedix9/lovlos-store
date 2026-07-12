@@ -3,6 +3,7 @@
 import { Fragment, useState, useEffect, useCallback, useRef } from "react";
 import { effectivePrice, type PDPProduct } from "@/lib/products";
 import type { SavedOrder } from "@/lib/orders";
+import { promoLabel, type PromoCode } from "@/lib/promo";
 import { SITE_URL } from "@/lib/site";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -10,7 +11,8 @@ import { SITE_URL } from "@/lib/site";
 interface ColorEntry {
   name: string;
   hex: string;
-  image: string;
+  image: string;    // primary — swatch/card thumbnail and gallery hero
+  images: string[]; // per-color gallery shown on the product page
 }
 
 interface RestockRequest {
@@ -43,6 +45,7 @@ interface FormState {
   category: string;
   price: string;
   salePrice: string;
+  costPrice: string;
   stock: string;
   badge: string;
   images: string[];
@@ -65,6 +68,7 @@ const DEFAULT_FORM: FormState = {
   category: "Women",
   price: "",
   salePrice: "",
+  costPrice: "",
   stock: "",
   badge: "",
   images: [],
@@ -97,11 +101,11 @@ const ORDER_STATUSES = ["pending", "confirmed", "dispatched", "delivered", "canc
 const PAID_STATUSES: ReadonlySet<SavedOrder["status"]> = new Set(["confirmed", "dispatched", "delivered"]);
 
 const STATUS_CLS: Record<SavedOrder["status"], string> = {
-  pending: "text-amber-400/80 border-amber-400/30",
-  confirmed: "text-sky-400/80 border-sky-400/30",
-  dispatched: "text-violet-400/80 border-violet-400/30",
-  delivered: "text-emerald-400/80 border-emerald-400/30",
-  cancelled: "text-red-400/60 border-red-400/25",
+  pending: "text-[rgb(var(--adm-amber)/var(--adm-a80))] border-[rgb(var(--adm-amber)/var(--adm-a30))]",
+  confirmed: "text-[rgb(var(--adm-sky)/var(--adm-a80))] border-[rgb(var(--adm-sky)/var(--adm-a30))]",
+  dispatched: "text-[rgb(var(--adm-violet)/var(--adm-a80))] border-[rgb(var(--adm-violet)/var(--adm-a30))]",
+  delivered: "text-[rgb(var(--adm-emerald)/var(--adm-a80))] border-[rgb(var(--adm-emerald)/var(--adm-a30))]",
+  cancelled: "text-[rgb(var(--adm-red)/var(--adm-a60))] border-[rgb(var(--adm-red)/var(--adm-a25))]",
 };
 
 function formatOrderDate(iso: string): string {
@@ -120,6 +124,38 @@ function waPhone(digits: string): string {
   if (digits.startsWith("0")) return "255" + digits.slice(1);
   if (digits.length === 9) return "255" + digits;
   return digits;
+}
+
+/** One-tap customer status update: prefilled WhatsApp message for the order's
+ *  current status, or null when there's nothing worth sending (cancelled). */
+function statusUpdateLink(o: SavedOrder): { label: string; url: string } | null {
+  const total = `TZS ${o.total.toLocaleString("en-TZ")}`;
+  let text: string;
+  let label: string;
+  switch (o.status) {
+    case "pending":
+      text = `Hello ${o.customer_name}! Thanks for your LOVLOS order ${o.id} (${total}). Please send your payment screenshot here to confirm it — or reply if you have any questions.`;
+      label = "Send payment reminder";
+      break;
+    case "confirmed":
+      text = `Hello ${o.customer_name}! Your LOVLOS order ${o.id} is confirmed ✅ We're preparing it for delivery to ${o.city} and will message you the moment it's on the way.`;
+      label = "Send confirmation";
+      break;
+    case "dispatched":
+      text = `Hello ${o.customer_name}! Your LOVLOS order ${o.id} is on its way to ${o.city} 🚚 Keep your phone close — you'll get a call on arrival.`;
+      label = "Send dispatch update";
+      break;
+    case "delivered":
+      text = `Hello ${o.customer_name}! We hope you're loving your LOVLOS order ${o.id} 🖤 Thank you for shopping with us — we'd love to hear what you think.`;
+      label = "Send thank-you";
+      break;
+    default:
+      return null;
+  }
+  return {
+    label,
+    url: `https://wa.me/${waPhone(o.phone.replace(/\D/g, ""))}?text=${encodeURIComponent(text)}`,
+  };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -141,10 +177,10 @@ async function uploadFile(file: File, adminKey: string): Promise<string> {
 
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
-    <div className="border border-white/10 p-6">
-      <p className="text-[9px] tracking-[0.3em] uppercase text-white/30 mb-3">{label}</p>
-      <p className="text-4xl font-light text-white tabular-nums">{value}</p>
-      {sub && <p className="text-[10px] text-white/25 mt-1.5">{sub}</p>}
+    <div className="border border-[rgb(var(--adm-fg)/var(--adm-a10))] p-6">
+      <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] mb-3">{label}</p>
+      <p className="text-4xl font-light text-[rgb(var(--adm-fg))] tabular-nums">{value}</p>
+      {sub && <p className="text-[10px] text-[rgb(var(--adm-fg)/var(--adm-a25))] mt-1.5">{sub}</p>}
     </div>
   );
 }
@@ -154,17 +190,17 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-[9px] tracking-[0.25em] uppercase text-white/40 mb-1.5 font-bold">
-        {label}{required && <span className="text-white/30 ml-1">*</span>}
+      <label className="block text-[9px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a40))] mb-1.5 font-bold">
+        {label}{required && <span className="text-[rgb(var(--adm-fg)/var(--adm-a30))] ml-1">*</span>}
       </label>
       {children}
     </div>
   );
 }
 
-const inputCls = "w-full bg-transparent border border-white/20 text-white px-3 py-2.5 text-sm focus:outline-none focus:border-white/60 transition-colors placeholder:text-white/20";
-const textareaCls = "w-full bg-transparent border border-white/20 text-white px-3 py-2 text-sm focus:outline-none focus:border-white/60 transition-colors placeholder:text-white/20 resize-none";
-const selectCls = "w-full bg-[#111] border border-white/20 text-white px-3 py-2.5 text-sm focus:outline-none focus:border-white/60 transition-colors";
+const inputCls = "w-full bg-transparent border border-[rgb(var(--adm-fg)/var(--adm-a20))] text-[rgb(var(--adm-fg))] px-3 py-2.5 text-sm focus:outline-none focus:border-[rgb(var(--adm-fg)/var(--adm-a60))] transition-colors placeholder:text-[rgb(var(--adm-fg)/var(--adm-a20))]";
+const textareaCls = "w-full bg-transparent border border-[rgb(var(--adm-fg)/var(--adm-a20))] text-[rgb(var(--adm-fg))] px-3 py-2 text-sm focus:outline-none focus:border-[rgb(var(--adm-fg)/var(--adm-a60))] transition-colors placeholder:text-[rgb(var(--adm-fg)/var(--adm-a20))] resize-none";
+const selectCls = "w-full bg-[var(--adm-bg2)] border border-[rgb(var(--adm-fg)/var(--adm-a20))] text-[rgb(var(--adm-fg))] px-3 py-2.5 text-sm focus:outline-none focus:border-[rgb(var(--adm-fg)/var(--adm-a60))] transition-colors";
 
 // ─── ImageGalleryEditor ───────────────────────────────────────────────────────
 // Manages an ordered list of image URLs. First = hero.
@@ -207,18 +243,18 @@ function ImageGalleryEditor({
 
   return (
     <div>
-      <label className="block text-[9px] tracking-[0.25em] uppercase text-white/40 mb-2 font-bold">
+      <label className="block text-[9px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a40))] mb-2 font-bold">
         Product Images
-        <span className="text-white/20 ml-1 normal-case tracking-normal font-normal"> — first image is the hero</span>
+        <span className="text-[rgb(var(--adm-fg)/var(--adm-a20))] ml-1 normal-case tracking-normal font-normal"> — first image is the hero</span>
       </label>
 
       <div className="flex flex-wrap gap-2">
         {images.map((url, i) => (
-          <div key={url + i} className="relative group w-20 h-20 flex-shrink-0 border border-white/15">
+          <div key={url + i} className="relative group w-20 h-20 flex-shrink-0 border border-[rgb(var(--adm-fg)/var(--adm-a15))]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={url} alt="" className="w-full h-full object-cover" />
             {i === 0 && (
-              <span className="absolute bottom-0 left-0 right-0 text-center text-[7px] tracking-wider uppercase bg-white/80 text-black py-0.5">
+              <span className="absolute bottom-0 left-0 right-0 text-center text-[7px] tracking-wider uppercase bg-[rgb(var(--adm-fg)/var(--adm-a80))] text-[var(--adm-bg)] py-0.5">
                 Hero
               </span>
             )}
@@ -239,23 +275,23 @@ function ImageGalleryEditor({
           onDrop={handleDrop}
           onClick={() => !uploading && inputRef.current?.click()}
           className={`w-20 h-20 border-2 border-dashed flex flex-col items-center justify-center gap-1 cursor-pointer flex-shrink-0 transition-colors ${
-            dragOver ? "border-white/50 bg-white/5" : "border-white/15 hover:border-white/35"
+            dragOver ? "border-[rgb(var(--adm-fg)/var(--adm-a50))] bg-[rgb(var(--adm-fg)/var(--adm-a05))]" : "border-[rgb(var(--adm-fg)/var(--adm-a15))] hover:border-[rgb(var(--adm-fg)/var(--adm-a35))]"
           } ${uploading ? "opacity-50 cursor-default" : ""}`}
         >
           {uploading ? (
-            <div className="w-4 h-4 border border-white/30 border-t-white/70 rounded-full animate-spin" />
+            <div className="w-4 h-4 border border-[rgb(var(--adm-fg)/var(--adm-a30))] border-t-[rgb(var(--adm-fg)/var(--adm-a70))] rounded-full animate-spin" />
           ) : (
             <>
-              <svg className="w-5 h-5 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-[rgb(var(--adm-fg)/var(--adm-a30))]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
               </svg>
-              <span className="text-[8px] tracking-wide uppercase text-white/25">Add</span>
+              <span className="text-[8px] tracking-wide uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))]">Add</span>
             </>
           )}
         </div>
       </div>
 
-      {error && <p className="text-red-400/80 text-[10px] tracking-wider mt-1.5">{error}</p>}
+      {error && <p className="text-[rgb(var(--adm-red)/var(--adm-a80))] text-[10px] tracking-wider mt-1.5">{error}</p>}
 
       <input ref={inputRef} type="file" accept={ACCEPT} onChange={(e) => { const f = e.target.files?.[0]; if (f) add(f); e.target.value = ""; }} className="hidden" />
     </div>
@@ -291,7 +327,7 @@ function CompactImageUpload({
   return (
     <div className="relative w-10 h-10 flex-shrink-0">
       {value ? (
-        <div className="w-10 h-10 border border-white/20 overflow-hidden group cursor-pointer" onClick={() => inputRef.current?.click()}>
+        <div className="w-10 h-10 border border-[rgb(var(--adm-fg)/var(--adm-a20))] overflow-hidden group cursor-pointer" onClick={() => inputRef.current?.click()}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={value} alt="" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-black/50 hidden group-hover:flex items-center justify-center">
@@ -304,13 +340,13 @@ function CompactImageUpload({
         <button
           type="button"
           onClick={() => !uploading && inputRef.current?.click()}
-          className="w-10 h-10 border border-dashed border-white/20 hover:border-white/40 flex items-center justify-center transition-colors"
+          className="w-10 h-10 border border-dashed border-[rgb(var(--adm-fg)/var(--adm-a20))] hover:border-[rgb(var(--adm-fg)/var(--adm-a40))] flex items-center justify-center transition-colors"
           title="Add color image (optional)"
         >
           {uploading ? (
-            <div className="w-3 h-3 border border-white/30 border-t-white/70 rounded-full animate-spin" />
+            <div className="w-3 h-3 border border-[rgb(var(--adm-fg)/var(--adm-a30))] border-t-[rgb(var(--adm-fg)/var(--adm-a70))] rounded-full animate-spin" />
           ) : (
-            <svg className="w-4 h-4 text-white/25" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 text-[rgb(var(--adm-fg)/var(--adm-a25))]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                 d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
               />
@@ -319,6 +355,76 @@ function CompactImageUpload({
         </button>
       )}
       <input ref={inputRef} type="file" accept={ACCEPT} onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} className="hidden" />
+    </div>
+  );
+}
+
+/** Per-color gallery strip — upload several photos, remove on hover. */
+function ColorGalleryUpload({
+  adminKey,
+  images,
+  onChange,
+}: {
+  adminKey: string;
+  images: string[];
+  onChange: (images: string[]) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const uploadAll = async (files: FileList) => {
+    setUploading(true);
+    try {
+      const urls: string[] = [];
+      for (const file of Array.from(files)) {
+        try {
+          urls.push(await uploadFile(file, adminKey));
+        } catch {
+          /* skip the failed file; the rest still land */
+        }
+      }
+      if (urls.length) onChange([...images, ...urls]);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {images.map((src, i) => (
+        <div key={src + i} className="relative w-10 h-10 border border-[rgb(var(--adm-fg)/var(--adm-a15))] overflow-hidden group">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={src} alt="" className="w-full h-full object-cover" />
+          <button
+            type="button"
+            onClick={() => onChange(images.filter((_, idx) => idx !== i))}
+            aria-label="Remove image"
+            className="absolute inset-0 bg-black/60 hidden group-hover:flex items-center justify-center text-white text-sm leading-none"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() => !uploading && inputRef.current?.click()}
+        title="Add photos for this color"
+        className="w-10 h-10 border border-dashed border-[rgb(var(--adm-fg)/var(--adm-a20))] hover:border-[rgb(var(--adm-fg)/var(--adm-a40))] flex items-center justify-center transition-colors text-[rgb(var(--adm-fg)/var(--adm-a30))] hover:text-[rgb(var(--adm-fg)/var(--adm-a60))]"
+      >
+        {uploading ? (
+          <div className="w-3 h-3 border border-[rgb(var(--adm-fg)/var(--adm-a30))] border-t-[rgb(var(--adm-fg)/var(--adm-a70))] rounded-full animate-spin" />
+        ) : (
+          "+"
+        )}
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={ACCEPT}
+        multiple
+        className="hidden"
+        onChange={(e) => { if (e.target.files?.length) uploadAll(e.target.files); e.target.value = ""; }}
+      />
     </div>
   );
 }
@@ -336,24 +442,24 @@ function ColorVariationsEditor({
   onToggle: (on: boolean) => void;
   onChange: (colors: ColorEntry[]) => void;
 }) {
-  const addColor = () => onChange([...colors, { name: "", hex: "#000000", image: "" }]);
+  const addColor = () => onChange([...colors, { name: "", hex: "#000000", image: "", images: [] }]);
   const removeColor = (i: number) => onChange(colors.filter((_, idx) => idx !== i));
   const updateColor = (i: number, patch: Partial<ColorEntry>) =>
     onChange(colors.map((c, idx) => (idx === i ? { ...c, ...patch } : c)));
 
   return (
-    <div className="border border-white/10 p-4 space-y-3">
+    <div className="border border-[rgb(var(--adm-fg)/var(--adm-a10))] p-4 space-y-3">
       {/* Toggle header */}
       <label className="flex items-center justify-between cursor-pointer">
         <div>
-          <p className="text-[9px] tracking-[0.25em] uppercase text-white/40 font-bold">Color Variations</p>
-          <p className="text-[9px] text-white/20 mt-0.5">Optional — enables per-color swatches and images on the product page</p>
+          <p className="text-[9px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a40))] font-bold">Color Variations</p>
+          <p className="text-[9px] text-[rgb(var(--adm-fg)/var(--adm-a20))] mt-0.5">Optional — enables per-color swatches and images on the product page</p>
         </div>
         <div
           onClick={() => onToggle(!enabled)}
-          className={`w-9 h-5 rounded-full transition-colors relative flex-shrink-0 ${enabled ? "bg-white" : "bg-white/15"}`}
+          className={`w-9 h-5 rounded-full transition-colors relative flex-shrink-0 ${enabled ? "bg-[rgb(var(--adm-fg))]" : "bg-[rgb(var(--adm-fg)/var(--adm-a15))]"}`}
         >
-          <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-black transition-all ${enabled ? "left-[18px]" : "left-0.5"}`} />
+          <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-[var(--adm-bg)] transition-all ${enabled ? "left-[18px]" : "left-0.5"}`} />
         </div>
       </label>
 
@@ -362,18 +468,19 @@ function ColorVariationsEditor({
           {/* Column headers */}
           {colors.length > 0 && (
             <div className="grid grid-cols-[40px_1fr_minmax(0,_120px)_40px_24px] gap-2 items-center">
-              <span className="text-[8px] uppercase tracking-wider text-white/20">Swatch</span>
-              <span className="text-[8px] uppercase tracking-wider text-white/20">Color Name</span>
-              <span className="text-[8px] uppercase tracking-wider text-white/20">Hex</span>
-              <span className="text-[8px] uppercase tracking-wider text-white/20">Image</span>
+              <span className="text-[8px] uppercase tracking-wider text-[rgb(var(--adm-fg)/var(--adm-a20))]">Swatch</span>
+              <span className="text-[8px] uppercase tracking-wider text-[rgb(var(--adm-fg)/var(--adm-a20))]">Color Name</span>
+              <span className="text-[8px] uppercase tracking-wider text-[rgb(var(--adm-fg)/var(--adm-a20))]">Hex</span>
+              <span className="text-[8px] uppercase tracking-wider text-[rgb(var(--adm-fg)/var(--adm-a20))]">Main</span>
               <span />
             </div>
           )}
 
           {colors.map((c, i) => (
-            <div key={i} className="grid grid-cols-[40px_1fr_minmax(0,_120px)_40px_24px] gap-2 items-center">
+            <div key={i} className="space-y-2 pb-3 border-b border-[rgb(var(--adm-fg)/var(--adm-a06))] last:border-b-0 last:pb-0">
+            <div className="grid grid-cols-[40px_1fr_minmax(0,_120px)_40px_24px] gap-2 items-center">
               {/* Live swatch preview */}
-              <div className="w-8 h-8 rounded-full border border-white/20 flex-shrink-0" style={{ backgroundColor: c.hex }} />
+              <div className="w-8 h-8 rounded-full border border-[rgb(var(--adm-fg)/var(--adm-a20))] flex-shrink-0" style={{ backgroundColor: c.hex }} />
 
               {/* Name */}
               <input
@@ -381,7 +488,7 @@ function ColorVariationsEditor({
                 value={c.name}
                 onChange={(e) => updateColor(i, { name: e.target.value })}
                 placeholder="e.g. Ivory"
-                className="bg-transparent border border-white/20 text-white px-2 py-1.5 text-xs focus:outline-none focus:border-white/50 transition-colors placeholder:text-white/15"
+                className="bg-transparent border border-[rgb(var(--adm-fg)/var(--adm-a20))] text-[rgb(var(--adm-fg))] px-2 py-1.5 text-xs focus:outline-none focus:border-[rgb(var(--adm-fg)/var(--adm-a50))] transition-colors placeholder:text-[rgb(var(--adm-fg)/var(--adm-a15))]"
               />
 
               {/* Hex */}
@@ -390,14 +497,14 @@ function ColorVariationsEditor({
                   type="color"
                   value={c.hex}
                   onChange={(e) => updateColor(i, { hex: e.target.value })}
-                  className="w-7 h-7 rounded border border-white/20 bg-transparent cursor-pointer p-0.5 flex-shrink-0"
+                  className="w-7 h-7 rounded border border-[rgb(var(--adm-fg)/var(--adm-a20))] bg-transparent cursor-pointer p-0.5 flex-shrink-0"
                 />
                 <input
                   type="text"
                   value={c.hex}
                   onChange={(e) => updateColor(i, { hex: e.target.value })}
                   maxLength={7}
-                  className="bg-transparent border border-white/20 text-white px-2 py-1.5 text-[10px] font-mono focus:outline-none focus:border-white/50 transition-colors w-full"
+                  className="bg-transparent border border-[rgb(var(--adm-fg)/var(--adm-a20))] text-[rgb(var(--adm-fg))] px-2 py-1.5 text-[10px] font-mono focus:outline-none focus:border-[rgb(var(--adm-fg)/var(--adm-a50))] transition-colors w-full"
                 />
               </div>
 
@@ -412,17 +519,31 @@ function ColorVariationsEditor({
               <button
                 type="button"
                 onClick={() => removeColor(i)}
-                className="text-white/20 hover:text-red-400/70 transition-colors text-lg leading-none"
+                className="text-[rgb(var(--adm-fg)/var(--adm-a20))] hover:text-[rgb(var(--adm-red)/var(--adm-a70))] transition-colors text-lg leading-none"
               >
                 ×
               </button>
+            </div>
+
+            {/* Per-color gallery — these photos replace the shared images
+                on the product page when this color is selected */}
+            <div className="pl-[48px]">
+              <p className="text-[8px] uppercase tracking-wider text-[rgb(var(--adm-fg)/var(--adm-a20))] mb-1.5">
+                Photos for this color {c.images.length > 0 && `· ${c.images.length}`}
+              </p>
+              <ColorGalleryUpload
+                adminKey={adminKey}
+                images={c.images}
+                onChange={(images) => updateColor(i, { images })}
+              />
+            </div>
             </div>
           ))}
 
           <button
             type="button"
             onClick={addColor}
-            className="text-[9px] tracking-[0.25em] uppercase text-white/30 hover:text-white/60 transition-colors border border-dashed border-white/15 hover:border-white/30 w-full py-2 mt-1"
+            className="text-[9px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] hover:text-[rgb(var(--adm-fg)/var(--adm-a60))] transition-colors border border-dashed border-[rgb(var(--adm-fg)/var(--adm-a15))] hover:border-[rgb(var(--adm-fg)/var(--adm-a30))] w-full py-2 mt-1"
           >
             + Add Color
           </button>
@@ -462,9 +583,9 @@ function HeroSlot({
 
   return (
     <div>
-      <p className="text-[8px] tracking-[0.25em] uppercase text-white/30 mb-1.5">{label}</p>
+      <p className="text-[8px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] mb-1.5">{label}</p>
       <div
-        className="relative h-24 w-full border border-dashed border-white/15 overflow-hidden cursor-pointer hover:border-white/35 transition-colors group"
+        className="relative h-24 w-full border border-dashed border-[rgb(var(--adm-fg)/var(--adm-a15))] overflow-hidden cursor-pointer hover:border-[rgb(var(--adm-fg)/var(--adm-a35))] transition-colors group"
         onClick={() => !uploading && inputRef.current?.click()}
       >
         {value && !uploading ? (
@@ -478,13 +599,13 @@ function HeroSlot({
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
             {uploading ? (
-              <div className="w-4 h-4 border border-white/30 border-t-white/70 rounded-full animate-spin" />
+              <div className="w-4 h-4 border border-[rgb(var(--adm-fg)/var(--adm-a30))] border-t-[rgb(var(--adm-fg)/var(--adm-a70))] rounded-full animate-spin" />
             ) : (
               <>
-                <svg className="w-5 h-5 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-[rgb(var(--adm-fg)/var(--adm-a20))]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <span className="text-[8px] tracking-wide uppercase text-white/20">Upload</span>
+                <span className="text-[8px] tracking-wide uppercase text-[rgb(var(--adm-fg)/var(--adm-a20))]">Upload</span>
               </>
             )}
           </div>
@@ -504,6 +625,19 @@ function HeroSlot({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AdminPage() {
+  // Theme — dark is the default; preference persists per browser
+  const [adminTheme, setAdminTheme] = useState<"dark" | "light">("dark");
+  useEffect(() => {
+    if (localStorage.getItem("lvl-admin-theme") === "light") setAdminTheme("light");
+  }, []);
+  const toggleAdminTheme = () =>
+    setAdminTheme((prev) => {
+      const next = prev === "dark" ? "light" : "dark";
+      localStorage.setItem("lvl-admin-theme", next);
+      return next;
+    });
+  const themeCls = adminTheme === "light" ? "adm-light" : "adm-dark";
+
   // Auth
   const [inputKey, setInputKey] = useState("");
   const [adminKey, setAdminKey] = useState<string | null>(null);
@@ -515,7 +649,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
 
   // UI
-  const [activeTab, setActiveTab] = useState<"overview" | "orders" | "inventory" | "reviews" | "hero">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "orders" | "inventory" | "reviews" | "promos" | "hero">("overview");
   const [showModal, setShowModal] = useState(false);
 
   // Inventory filters
@@ -535,6 +669,7 @@ export default function AdminPage() {
   const [ordersError, setOrdersError] = useState("");
   const [statusSaving, setStatusSaving] = useState<string | null>(null);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+  const [resettingOrders, setResettingOrders] = useState(false);
 
   // Restock waitlist
   const [restockRequests, setRestockRequests] = useState<RestockRequest[]>([]);
@@ -545,6 +680,20 @@ export default function AdminPage() {
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState("");
   const [reviewActing, setReviewActing] = useState<string | null>(null);
+
+  // Promo codes
+  const [promos, setPromos] = useState<PromoCode[]>([]);
+  const [promosLoading, setPromosLoading] = useState(false);
+  const [promosError, setPromosError] = useState("");
+  const [promoForm, setPromoForm] = useState({ code: "", type: "percent" as PromoCode["discount_type"], value: "", minSubtotal: "", maxUses: "", expiresAt: "" });
+  const [promoSaving, setPromoSaving] = useState(false);
+  const [promoActing, setPromoActing] = useState<string | null>(null);
+
+  // Welcome offer (code shown after email sign-up)
+  const [welcomePromo, setWelcomePromo] = useState("");
+  const [welcomeSaving, setWelcomeSaving] = useState(false);
+  const [welcomeSaved, setWelcomeSaved] = useState(false);
+  const [welcomeError, setWelcomeError] = useState("");
 
   // Order alerts (web push)
   const [pushState, setPushState] = useState<"idle" | "enabling" | "enabled" | "denied" | "unsupported" | "error">("idle");
@@ -632,8 +781,26 @@ export default function AdminPage() {
       if (res.ok) {
         const json = await res.json();
         setAnnouncement(json.announcement ?? "");
+        setWelcomePromo(json.welcome_promo ?? "");
       }
     } catch { /* silent — editor starts blank */ }
+  }, []);
+
+  const fetchPromos = useCallback(async (key: string) => {
+    setPromosLoading(true);
+    setPromosError("");
+    try {
+      const res = await fetch("/api/admin/promos", { headers: { "x-admin-key": key } });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error ?? "");
+      }
+      setPromos(await res.json());
+    } catch (e) {
+      setPromosError(e instanceof Error && e.message ? `Failed to load promo codes: ${e.message}` : "Failed to load promo codes.");
+    } finally {
+      setPromosLoading(false);
+    }
   }, []);
 
   const fetchSubscribers = useCallback(async (key: string) => {
@@ -671,7 +838,133 @@ export default function AdminPage() {
     fetchReviews(adminKey);
     fetchSettings(adminKey);
     fetchSubscribers(adminKey);
-  }, [adminKey, fetchProducts, fetchHeroImages, fetchOrders, fetchRestock, fetchReviews, fetchSettings, fetchSubscribers]);
+    fetchPromos(adminKey);
+  }, [adminKey, fetchProducts, fetchHeroImages, fetchOrders, fetchRestock, fetchReviews, fetchSettings, fetchSubscribers, fetchPromos]);
+
+  /** Testing-phase reset: wipes every order, releases held stock, zeroes
+   *  promo redemption counts. Guarded by a typed confirmation. */
+  const handleResetOrders = async () => {
+    if (!adminKey || resettingOrders) return;
+    const typed = window.prompt(
+      `This permanently deletes ALL ${orders.length} orders and resets revenue, profit, and promo redemption counts to zero. Stock held by confirmed orders is added back.\n\nProducts, promo codes, reviews, and subscribers are NOT touched.\n\nType RESET to continue:`
+    );
+    if (typed !== "RESET") return;
+    setResettingOrders(true);
+    setOrdersError("");
+    try {
+      const res = await fetch("/api/admin/orders", {
+        method: "DELETE",
+        headers: { "x-admin-key": adminKey },
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error ?? "Reset failed.");
+      }
+      setOrders([]);
+      setExpandedOrder(null);
+      /* Stock and promo counters changed server-side — refresh both */
+      fetchProducts(adminKey);
+      fetchPromos(adminKey);
+    } catch (e) {
+      setOrdersError(e instanceof Error ? e.message : "Reset failed.");
+    } finally {
+      setResettingOrders(false);
+    }
+  };
+
+  // ── Promo code actions ─────────────────────────────────────────────────────
+
+  const handleCreatePromo = async (e: React.BaseSyntheticEvent) => {
+    e.preventDefault();
+    if (!adminKey) return;
+    setPromoSaving(true);
+    setPromosError("");
+    try {
+      const res = await fetch("/api/admin/promos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify({
+          code: promoForm.code,
+          discount_type: promoForm.type,
+          discount_value: Number(promoForm.value),
+          min_subtotal: Number(promoForm.minSubtotal) || 0,
+          max_uses: promoForm.maxUses.trim() === "" ? null : Number(promoForm.maxUses),
+          expires_at: promoForm.expiresAt ? new Date(promoForm.expiresAt).toISOString() : null,
+        }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error ?? "Failed to create promo code.");
+      }
+      setPromoForm({ code: "", type: "percent", value: "", minSubtotal: "", maxUses: "", expiresAt: "" });
+      await fetchPromos(adminKey);
+    } catch (err) {
+      setPromosError(err instanceof Error ? err.message : "Failed to create promo code.");
+    } finally {
+      setPromoSaving(false);
+    }
+  };
+
+  const handleTogglePromo = async (promo: PromoCode) => {
+    if (!adminKey) return;
+    setPromoActing(promo.code);
+    setPromosError("");
+    try {
+      const res = await fetch("/api/admin/promos", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify({ code: promo.code, active: !promo.active }),
+      });
+      if (!res.ok) throw new Error();
+      setPromos((prev) => prev.map((p) => (p.code === promo.code ? { ...p, active: !p.active } : p)));
+    } catch {
+      setPromosError("Failed to update promo code.");
+    } finally {
+      setPromoActing(null);
+    }
+  };
+
+  const handleDeletePromo = async (code: string) => {
+    if (!adminKey || !confirm(`Delete promo code ${code}? Customers will no longer be able to use it.`)) return;
+    setPromoActing(code);
+    setPromosError("");
+    try {
+      const res = await fetch(`/api/admin/promos?code=${encodeURIComponent(code)}`, {
+        method: "DELETE",
+        headers: { "x-admin-key": adminKey },
+      });
+      if (!res.ok) throw new Error();
+      setPromos((prev) => prev.filter((p) => p.code !== code));
+    } catch {
+      setPromosError("Failed to delete promo code.");
+    } finally {
+      setPromoActing(null);
+    }
+  };
+
+  const handleSaveWelcome = async () => {
+    if (!adminKey) return;
+    setWelcomeSaving(true);
+    setWelcomeError("");
+    setWelcomeSaved(false);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify({ key: "welcome_promo", value: welcomePromo }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error ?? "Failed to save.");
+      }
+      setWelcomeSaved(true);
+      setTimeout(() => setWelcomeSaved(false), 2500);
+    } catch (err) {
+      setWelcomeError(err instanceof Error ? err.message : "Failed to save.");
+    } finally {
+      setWelcomeSaving(false);
+    }
+  };
 
   // ── Login ──────────────────────────────────────────────────────────────────
 
@@ -721,11 +1014,12 @@ export default function AdminPage() {
       category: p.category,
       price: String(p.price),
       salePrice: p.salePrice != null ? String(p.salePrice) : "",
+      costPrice: p.costPrice != null ? String(p.costPrice) : "",
       stock: String(p.stock ?? 0),
       badge: p.badge ?? "",
       images: p.images ?? [],
       hasColors: (p.colors?.length ?? 0) > 0,
-      colors: (p.colors ?? []).map((c) => ({ name: c.name, hex: c.hex, image: c.image ?? "" })),
+      colors: (p.colors ?? []).map((c) => ({ name: c.name, hex: c.hex, image: c.image ?? "", images: c.images ?? [] })),
       description: p.description ?? "",
       materials: p.materials ?? "",
       care: p.care ?? "",
@@ -762,11 +1056,17 @@ export default function AdminPage() {
       category: form.category,
       price: Number(form.price),
       salePrice: form.salePrice.trim() === "" ? null : Number(form.salePrice),
+      costPrice: form.costPrice.trim() === "" ? null : Number(form.costPrice),
       stock: Number(form.stock) || 0,
       badge: form.badge || undefined,
       images: form.images,
       colors: form.hasColors
-        ? form.colors.map((c) => ({ name: c.name, hex: c.hex, ...(c.image ? { image: c.image } : {}) }))
+        ? form.colors.map((c) => ({
+            name: c.name,
+            hex: c.hex,
+            ...(c.image ? { image: c.image } : {}),
+            ...(c.images.filter(Boolean).length ? { images: c.images.filter(Boolean) } : {}),
+          }))
         : [],
       description: form.description,
       materials: form.materials,
@@ -1094,6 +1394,7 @@ export default function AdminPage() {
   const accessories = products.filter((p) => p.category === "Accessories").length;
   const unitsInStock = products.reduce((sum, p) => sum + (p.stock ?? 0), 0);
   const stockValue = products.reduce((sum, p) => sum + (p.stock ?? 0) * effectivePrice(p), 0);
+  const stockCost = products.reduce((sum, p) => sum + (p.stock ?? 0) * (p.costPrice ?? 0), 0);
   const outOfStock = products.filter((p) => !p.isComingSoon && (p.stock ?? 0) === 0).length;
   const lowStock = products.filter((p) => !p.isComingSoon && (p.stock ?? 0) > 0 && (p.stock ?? 0) <= 5).length;
 
@@ -1110,14 +1411,61 @@ export default function AdminPage() {
     })
     .reduce((sum, o) => sum + o.total, 0);
 
+  /* Gross profit = item sales − discounts − buying costs. Delivery fees are
+     treated as pass-through and excluded. Cost comes from the snapshot taken
+     at sale time, falling back to the product's current buying price. */
+  let grossProfit = 0;
+  let monthProfit = 0;
+  let unknownCostUnits = 0;
+  for (const o of paidOrders) {
+    let cogs = 0;
+    for (const item of o.items ?? []) {
+      const qty = item.quantity || 1;
+      const cost = item.cost ?? products.find((p) => p.id === item.id)?.costPrice ?? null;
+      if (cost == null) unknownCostUnits += qty;
+      else cogs += cost * qty;
+    }
+    const orderProfit = o.subtotal - (o.discount ?? 0) - cogs;
+    grossProfit += orderProfit;
+    const d = new Date(o.created_at);
+    if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+      monthProfit += orderProfit;
+    }
+  }
+  const missingCostProducts = products.filter((p) => p.costPrice == null).length;
+
+  /* Promo performance — cancelled orders excluded so abandoned promos don't inflate the numbers */
+  const promoOrders = orders.filter((o) => o.promo_code && (o.discount ?? 0) > 0 && o.status !== "cancelled");
+  const discountGiven = promoOrders.reduce((sum, o) => sum + (o.discount ?? 0), 0);
+  const totalRedemptions = promos.reduce((sum, p) => sum + p.use_count, 0);
+  const activeCodes = promos.filter(
+    (p) =>
+      p.active &&
+      (p.expires_at == null || new Date(p.expires_at).getTime() >= Date.now()) &&
+      (p.max_uses == null || p.use_count < p.max_uses)
+  ).length;
+  const promoRows = promos
+    .map((p) => {
+      const codeOrders = promoOrders.filter((o) => o.promo_code === p.code);
+      return {
+        code: p.code,
+        label: promoLabel(p),
+        uses: p.use_count,
+        discount: codeOrders.reduce((sum, o) => sum + (o.discount ?? 0), 0),
+        revenue: codeOrders.filter((o) => PAID_STATUSES.has(o.status)).reduce((sum, o) => sum + o.total, 0),
+      };
+    })
+    .filter((r) => r.uses > 0)
+    .sort((a, b) => b.uses - a.uses);
+
   // ── Login screen ───────────────────────────────────────────────────────────
 
   if (!adminKey) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center p-6">
+      <div className={`${themeCls} min-h-screen bg-[var(--adm-bg)] flex flex-col items-center justify-center p-6`}>
         <div className="w-full max-w-[340px]">
-          <p className="text-[9px] tracking-[0.5em] uppercase text-white/25 text-center mb-1">LOVLOS</p>
-          <h1 className="text-xl font-light text-white text-center tracking-[0.35em] uppercase mb-10">Admin Access</h1>
+          <p className="text-[9px] tracking-[0.5em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] text-center mb-1">LOVLOS</p>
+          <h1 className="text-xl font-light text-[rgb(var(--adm-fg))] text-center tracking-[0.35em] uppercase mb-10">Admin Access</h1>
           <form onSubmit={handleLogin} className="space-y-3">
             <input
               type="password"
@@ -1126,13 +1474,13 @@ export default function AdminPage() {
               onChange={(e) => setInputKey(e.target.value)}
               autoFocus
               required
-              className="w-full bg-transparent border border-white/20 text-white placeholder:text-white/20 px-4 py-3 text-xs tracking-widest uppercase focus:outline-none focus:border-white/50 transition-colors"
+              className="w-full bg-transparent border border-[rgb(var(--adm-fg)/var(--adm-a20))] text-[rgb(var(--adm-fg))] placeholder:text-[rgb(var(--adm-fg)/var(--adm-a20))] px-4 py-3 text-xs tracking-widest uppercase focus:outline-none focus:border-[rgb(var(--adm-fg)/var(--adm-a50))] transition-colors"
             />
-            {loginError && <p className="text-red-400/80 text-[10px] tracking-widest text-center">{loginError}</p>}
+            {loginError && <p className="text-[rgb(var(--adm-red)/var(--adm-a80))] text-[10px] tracking-widest text-center">{loginError}</p>}
             <button
               type="submit"
               disabled={loginLoading}
-              className="w-full bg-white text-black text-[10px] tracking-[0.3em] uppercase py-3 font-bold hover:bg-white/90 transition-colors disabled:opacity-40"
+              className="w-full bg-[rgb(var(--adm-fg))] text-[var(--adm-bg)] text-[10px] tracking-[0.3em] uppercase py-3 font-bold hover:bg-[rgb(var(--adm-fg)/var(--adm-a90))] transition-colors disabled:opacity-40"
             >
               {loginLoading ? "VERIFYING..." : "ENTER"}
             </button>
@@ -1145,34 +1493,43 @@ export default function AdminPage() {
   // ── Dashboard ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
-      <header className="border-b border-white/[0.08] px-6 md:px-10 h-14 flex items-center justify-between">
+    <div className={`${themeCls} min-h-screen bg-[var(--adm-bg)] text-[rgb(var(--adm-fg))]`}>
+      <header className="border-b border-[rgb(var(--adm-fg)/var(--adm-a08))] px-6 md:px-10 h-14 flex items-center justify-between">
         <div className="flex items-center gap-5">
           <span className="text-[10px] tracking-[0.45em] uppercase font-bold">LOVLOS</span>
-          <span className="text-white/15 text-lg leading-none">|</span>
-          <span className="text-[10px] tracking-[0.3em] uppercase text-white/30">ADMIN</span>
+          <span className="text-[rgb(var(--adm-fg)/var(--adm-a15))] text-lg leading-none">|</span>
+          <span className="text-[10px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))]">ADMIN</span>
         </div>
-        <button onClick={handleSignOut} className="text-[9px] tracking-[0.25em] uppercase text-white/25 hover:text-white/50 transition-colors">
-          SIGN OUT
-        </button>
+        <div className="flex items-center gap-6">
+          <button
+            onClick={toggleAdminTheme}
+            aria-label={adminTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            className="text-[9px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] hover:text-[rgb(var(--adm-fg)/var(--adm-a50))] transition-colors"
+          >
+            {adminTheme === "dark" ? "☀ LIGHT" : "☾ DARK"}
+          </button>
+          <button onClick={handleSignOut} className="text-[9px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] hover:text-[rgb(var(--adm-fg)/var(--adm-a50))] transition-colors">
+            SIGN OUT
+          </button>
+        </div>
       </header>
 
       <main className="px-6 md:px-10 py-8 max-w-7xl mx-auto">
-        <nav className="flex gap-8 border-b border-white/[0.08] mb-10">
-          {(["overview", "orders", "inventory", "reviews", "hero"] as const).map((tab) => (
+        <nav className="flex gap-8 border-b border-[rgb(var(--adm-fg)/var(--adm-a08))] mb-10">
+          {(["overview", "orders", "inventory", "reviews", "promos", "hero"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`pb-4 text-[9px] tracking-[0.3em] uppercase transition-colors ${
-                activeTab === tab ? "text-white border-b border-white -mb-px" : "text-white/25 hover:text-white/50"
+                activeTab === tab ? "text-[rgb(var(--adm-fg))] border-b border-[rgb(var(--adm-fg))] -mb-px" : "text-[rgb(var(--adm-fg)/var(--adm-a25))] hover:text-[rgb(var(--adm-fg)/var(--adm-a50))]"
               }`}
             >
               {tab === "hero" ? "Site & Banners" : tab}
               {tab === "orders" && pendingOrders > 0 && (
-                <span className="ml-1.5 text-[8px] text-amber-400/80 tabular-nums">{pendingOrders}</span>
+                <span className="ml-1.5 text-[8px] text-[rgb(var(--adm-amber)/var(--adm-a80))] tabular-nums">{pendingOrders}</span>
               )}
               {tab === "reviews" && pendingReviews > 0 && (
-                <span className="ml-1.5 text-[8px] text-amber-400/80 tabular-nums">{pendingReviews}</span>
+                <span className="ml-1.5 text-[8px] text-[rgb(var(--adm-amber)/var(--adm-a80))] tabular-nums">{pendingReviews}</span>
               )}
             </button>
           ))}
@@ -1181,22 +1538,73 @@ export default function AdminPage() {
         {/* ── Overview ──────────────────────────────────────────────────────── */}
         {activeTab === "overview" && (
           <section>
-            <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-6">Orders &amp; Revenue</p>
+            <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] mb-6">Orders &amp; Revenue</p>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
               <StatCard label="Total Orders" value={orders.length} />
               <StatCard label="Pending" value={pendingOrders} sub="Awaiting payment confirmation" />
               <StatCard label="Delivered" value={deliveredOrders} />
               <StatCard label="Email Subscribers" value={subscribers.length} sub="Footer + checkout sign-ups" />
             </div>
-            <div className="border border-white/10 p-6 mb-10">
-              <p className="text-[9px] tracking-[0.3em] uppercase text-white/30 mb-3">Revenue</p>
-              <p className="text-4xl font-light">TZS {revenue.toLocaleString("en-TZ")}</p>
-              <p className="text-[10px] text-white/25 mt-1.5">
-                Confirmed, dispatched &amp; delivered orders · TZS {monthRevenue.toLocaleString("en-TZ")} this month
-              </p>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-10">
+              <div className="border border-[rgb(var(--adm-fg)/var(--adm-a10))] p-6">
+                <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] mb-3">Revenue</p>
+                <p className="text-4xl font-light">TZS {revenue.toLocaleString("en-TZ")}</p>
+                <p className="text-[10px] text-[rgb(var(--adm-fg)/var(--adm-a25))] mt-1.5">
+                  Confirmed, dispatched &amp; delivered orders · TZS {monthRevenue.toLocaleString("en-TZ")} this month
+                </p>
+              </div>
+              <div className="border border-[rgb(var(--adm-fg)/var(--adm-a10))] p-6">
+                <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] mb-3">Gross Profit</p>
+                <p className={`text-4xl font-light ${grossProfit < 0 ? "text-[rgb(var(--adm-red)/var(--adm-a80))]" : ""}`}>
+                  TZS {grossProfit.toLocaleString("en-TZ")}
+                </p>
+                <p className="text-[10px] text-[rgb(var(--adm-fg)/var(--adm-a25))] mt-1.5">
+                  Sales − discounts − buying costs (delivery excluded) · TZS {monthProfit.toLocaleString("en-TZ")} this month
+                </p>
+                {unknownCostUnits > 0 && (
+                  <p className="text-[10px] text-[rgb(var(--adm-amber)/var(--adm-a60))] mt-1.5">
+                    {unknownCostUnits} sold {unknownCostUnits === 1 ? "unit has" : "units have"} no buying price — profit is overstated until costs are filled in
+                  </p>
+                )}
+              </div>
             </div>
 
-            <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-6">Inventory Overview</p>
+            <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] mb-6">Promotions</p>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+              <StatCard label="Active Codes" value={activeCodes} sub="Live, unexpired, not fully redeemed" />
+              <StatCard label="Redemptions" value={totalRedemptions} />
+              <StatCard label="Discount Given" value={`TZS ${discountGiven.toLocaleString("en-TZ")}`} sub="Across all non-cancelled orders" />
+              <StatCard label="Promo Revenue" value={`TZS ${promoRows.reduce((s, r) => s + r.revenue, 0).toLocaleString("en-TZ")}`} sub="Paid orders that used a code" />
+            </div>
+            {promoRows.length > 0 && (
+              <div className="border border-[rgb(var(--adm-fg)/var(--adm-a10))] mb-10 overflow-x-auto">
+                <table className="w-full min-w-[520px]">
+                  <thead>
+                    <tr className="border-b border-[rgb(var(--adm-fg)/var(--adm-a08))]">
+                      {["Code", "Uses", "Discount (TZS)", "Revenue (TZS)"].map((h, i) => (
+                        <th key={i} className="text-left text-[9px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] px-4 py-3 font-normal">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {promoRows.map((r) => (
+                      <tr key={r.code} className="border-b border-[rgb(var(--adm-fg)/var(--adm-a04))]">
+                        <td className="px-4 py-3">
+                          <span className="text-xs font-mono text-[rgb(var(--adm-fg))]">{r.code}</span>
+                          <span className="text-[10px] text-[rgb(var(--adm-fg)/var(--adm-a30))] ml-2">{r.label}</span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a50))] tabular-nums">{r.uses}</td>
+                        <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a50))] tabular-nums">{r.discount.toLocaleString("en-TZ")}</td>
+                        <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a80))] tabular-nums">{r.revenue.toLocaleString("en-TZ")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {promoRows.length === 0 && <div className="mb-10" />}
+
+            <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] mb-6">Inventory Overview</p>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
               <StatCard label="Total Products" value={products.length} />
               <StatCard label="Men's Items" value={men} />
@@ -1204,16 +1612,22 @@ export default function AdminPage() {
               <StatCard label="Accessories" value={accessories} />
             </div>
 
-            <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-6 mt-10">Stock &amp; Value</p>
+            <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] mb-6 mt-10">Stock &amp; Value</p>
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
               <StatCard label="Units in Stock" value={unitsInStock.toLocaleString("en-TZ")} sub="Total units across all products" />
               <StatCard label="Low Stock" value={lowStock} sub="Live products with 5 or fewer units" />
               <StatCard label="Out of Stock" value={outOfStock} sub="Live products with zero units" />
             </div>
-            <div className="border border-white/10 p-6">
-              <p className="text-[9px] tracking-[0.3em] uppercase text-white/30 mb-3">Stock Value</p>
+            <div className="border border-[rgb(var(--adm-fg)/var(--adm-a10))] p-6">
+              <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] mb-3">Stock Value</p>
               <p className="text-4xl font-light">TZS {stockValue.toLocaleString("en-TZ")}</p>
-              <p className="text-[10px] text-white/25 mt-1.5">Units in stock × price — revenue if everything on hand sells</p>
+              <p className="text-[10px] text-[rgb(var(--adm-fg)/var(--adm-a25))] mt-1.5">Units in stock × price — revenue if everything on hand sells</p>
+              <p className="text-[10px] text-[rgb(var(--adm-fg)/var(--adm-a25))] mt-1.5">
+                Tied up in stock: TZS {stockCost.toLocaleString("en-TZ")} · potential profit TZS {(stockValue - stockCost).toLocaleString("en-TZ")}
+                {missingCostProducts > 0 && (
+                  <span className="text-[rgb(var(--adm-amber)/var(--adm-a60))]"> · {missingCostProducts} {missingCostProducts === 1 ? "product has" : "products have"} no buying price</span>
+                )}
+              </p>
             </div>
           </section>
         )}
@@ -1222,30 +1636,42 @@ export default function AdminPage() {
         {activeTab === "orders" && (
           <section>
             <div className="flex items-center justify-between mb-6">
-              <p className="text-[9px] tracking-[0.3em] uppercase text-white/25">
+              <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))]">
                 {orders.length} {orders.length === 1 ? "Order" : "Orders"}
-                {pendingOrders > 0 && <span className="text-amber-400/60 ml-2">· {pendingOrders} pending</span>}
+                {pendingOrders > 0 && <span className="text-[rgb(var(--adm-amber)/var(--adm-a60))] ml-2">· {pendingOrders} pending</span>}
               </p>
-              <button
-                onClick={() => adminKey && fetchOrders(adminKey)}
-                disabled={ordersLoading}
-                className="text-[9px] tracking-[0.25em] uppercase text-white/30 hover:text-white/60 transition-colors disabled:opacity-40"
-              >
-                Refresh
-              </button>
+              <div className="flex items-center gap-5">
+                {orders.length > 0 && (
+                  <button
+                    onClick={handleResetOrders}
+                    disabled={resettingOrders}
+                    title="Delete all orders and reset revenue — for the testing phase"
+                    className="text-[9px] tracking-[0.25em] uppercase text-[rgb(var(--adm-red)/var(--adm-a50))] hover:text-[rgb(var(--adm-red)/var(--adm-a90))] transition-colors disabled:opacity-40"
+                  >
+                    {resettingOrders ? "Resetting..." : "Reset All (Test Data)"}
+                  </button>
+                )}
+                <button
+                  onClick={() => adminKey && fetchOrders(adminKey)}
+                  disabled={ordersLoading}
+                  className="text-[9px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] hover:text-[rgb(var(--adm-fg)/var(--adm-a60))] transition-colors disabled:opacity-40"
+                >
+                  Refresh
+                </button>
+              </div>
             </div>
 
-            {ordersError && <p className="text-red-400/80 text-[10px] tracking-wider mb-4">{ordersError}</p>}
+            {ordersError && <p className="text-[rgb(var(--adm-red)/var(--adm-a80))] text-[10px] tracking-wider mb-4">{ordersError}</p>}
 
             {ordersLoading ? (
-              <div className="border border-white/[0.08] py-24 text-center text-[9px] tracking-[0.3em] uppercase text-white/20">Loading...</div>
+              <div className="border border-[rgb(var(--adm-fg)/var(--adm-a08))] py-24 text-center text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a20))]">Loading...</div>
             ) : (
-              <div className="border border-white/[0.08] overflow-x-auto">
+              <div className="border border-[rgb(var(--adm-fg)/var(--adm-a08))] overflow-x-auto">
                 <table className="w-full min-w-[820px]">
                   <thead>
-                    <tr className="border-b border-white/[0.08]">
+                    <tr className="border-b border-[rgb(var(--adm-fg)/var(--adm-a08))]">
                       {["Order", "Date", "Customer", "City", "Payment", "Total (TZS)", "Status"].map((h, i) => (
-                        <th key={i} className="text-left text-[9px] tracking-[0.25em] uppercase text-white/25 px-4 py-3 font-normal">{h}</th>
+                        <th key={i} className="text-left text-[9px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] px-4 py-3 font-normal">{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -1254,71 +1680,77 @@ export default function AdminPage() {
                       <Fragment key={o.id}>
                         <tr
                           onClick={() => setExpandedOrder(expandedOrder === o.id ? null : o.id)}
-                          className="border-b border-white/[0.04] hover:bg-white/[0.015] transition-colors cursor-pointer"
+                          className="border-b border-[rgb(var(--adm-fg)/var(--adm-a04))] hover:bg-[rgb(var(--adm-fg)/var(--adm-a015))] transition-colors cursor-pointer"
                         >
                           <td className="px-4 py-3">
-                            <span className="text-xs font-mono text-white">{o.id}</span>
+                            <span className="text-xs font-mono text-[rgb(var(--adm-fg))]">{o.id}</span>
                             {o.items.some((i) => i.preorder) && (
-                              <span className="ml-2 text-[8px] tracking-wider uppercase border border-sky-400/30 text-sky-400/70 px-1.5 py-0.5">Pre-Order</span>
+                              <span className="ml-2 text-[8px] tracking-wider uppercase border border-[rgb(var(--adm-sky)/var(--adm-a30))] text-[rgb(var(--adm-sky)/var(--adm-a70))] px-1.5 py-0.5">Pre-Order</span>
                             )}
-                            <span className={`ml-2 inline-block text-white/25 text-[9px] transition-transform ${expandedOrder === o.id ? "rotate-90" : ""}`}>▸</span>
+                            <span className={`ml-2 inline-block text-[rgb(var(--adm-fg)/var(--adm-a25))] text-[9px] transition-transform ${expandedOrder === o.id ? "rotate-90" : ""}`}>▸</span>
                           </td>
-                          <td className="px-4 py-3 text-xs text-white/50 whitespace-nowrap">{formatOrderDate(o.created_at)}</td>
+                          <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a50))] whitespace-nowrap">{formatOrderDate(o.created_at)}</td>
                           <td className="px-4 py-3">
-                            <p className="text-xs text-white/80">{o.customer_name}</p>
-                            <p className="text-[10px] text-white/30 mt-0.5">{o.phone}</p>
+                            <p className="text-xs text-[rgb(var(--adm-fg)/var(--adm-a80))]">{o.customer_name}</p>
+                            <p className="text-[10px] text-[rgb(var(--adm-fg)/var(--adm-a30))] mt-0.5">{o.phone}</p>
                           </td>
-                          <td className="px-4 py-3 text-xs text-white/50">{o.city}</td>
-                          <td className="px-4 py-3 text-xs text-white/50 whitespace-nowrap">
+                          <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a50))]">{o.city}</td>
+                          <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a50))] whitespace-nowrap">
                             {o.payment_method === "mobile-money" ? "Mobile Money" : "Cash on Delivery"}
                           </td>
-                          <td className="px-4 py-3 text-xs text-white/80 tabular-nums">{o.total.toLocaleString("en-TZ")}</td>
+                          <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a80))] tabular-nums">{o.total.toLocaleString("en-TZ")}</td>
                           <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                             <select
                               value={o.status}
                               disabled={statusSaving === o.id}
                               onChange={(e) => handleStatusChange(o.id, e.target.value as SavedOrder["status"])}
-                              className={`bg-[#111] border text-[9px] tracking-[0.15em] uppercase px-2 py-1.5 focus:outline-none transition-colors disabled:opacity-40 cursor-pointer ${STATUS_CLS[o.status]}`}
+                              className={`bg-[var(--adm-bg2)] border text-[9px] tracking-[0.15em] uppercase px-2 py-1.5 focus:outline-none transition-colors disabled:opacity-40 cursor-pointer ${STATUS_CLS[o.status]}`}
                             >
                               {ORDER_STATUSES.map((s) => (
-                                <option key={s} value={s} className="text-white bg-[#111]">{s}</option>
+                                <option key={s} value={s} className="text-[rgb(var(--adm-fg))] bg-[var(--adm-bg2)]">{s}</option>
                               ))}
                             </select>
                           </td>
                         </tr>
                         {expandedOrder === o.id && (
-                          <tr className="border-b border-white/[0.04] bg-white/[0.01]">
+                          <tr className="border-b border-[rgb(var(--adm-fg)/var(--adm-a04))] bg-[rgb(var(--adm-fg)/var(--adm-a01))]">
                             <td colSpan={7} className="px-4 py-4">
                               <div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-6">
                                 {/* Items */}
                                 <div>
-                                  <p className="text-[8px] tracking-[0.25em] uppercase text-white/25 mb-2">Items</p>
+                                  <p className="text-[8px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] mb-2">Items</p>
                                   <div className="space-y-1.5">
                                     {o.items.map((item, i) => (
                                       <div key={i} className="flex items-baseline justify-between gap-4 text-xs">
-                                        <span className="text-white/70">
+                                        <span className="text-[rgb(var(--adm-fg)/var(--adm-a70))]">
                                           {item.name}
                                           {item.preorder && (
-                                            <span className="text-[8px] tracking-wider uppercase text-sky-400/70 ml-1.5">Pre-Order</span>
+                                            <span className="text-[8px] tracking-wider uppercase text-[rgb(var(--adm-sky)/var(--adm-a70))] ml-1.5">Pre-Order</span>
                                           )}
-                                          <span className="text-white/30 ml-2">
+                                          <span className="text-[rgb(var(--adm-fg)/var(--adm-a30))] ml-2">
                                             {[item.color, item.size].filter(Boolean).join(" · ")} × {item.quantity}
                                           </span>
                                         </span>
-                                        <span className="text-white/50 tabular-nums whitespace-nowrap">
+                                        <span className="text-[rgb(var(--adm-fg)/var(--adm-a50))] tabular-nums whitespace-nowrap">
                                           {(item.price * item.quantity).toLocaleString("en-TZ")}
                                         </span>
                                       </div>
                                     ))}
                                   </div>
-                                  <div className="border-t border-white/[0.06] mt-3 pt-2 space-y-1 text-[11px]">
-                                    <div className="flex justify-between text-white/40">
+                                  <div className="border-t border-[rgb(var(--adm-fg)/var(--adm-a06))] mt-3 pt-2 space-y-1 text-[11px]">
+                                    <div className="flex justify-between text-[rgb(var(--adm-fg)/var(--adm-a40))]">
                                       <span>Subtotal</span><span className="tabular-nums">{o.subtotal.toLocaleString("en-TZ")}</span>
                                     </div>
-                                    <div className="flex justify-between text-white/40">
+                                    {(o.discount ?? 0) > 0 && (
+                                      <div className="flex justify-between text-[rgb(var(--adm-emerald)/var(--adm-a60))]">
+                                        <span>Discount{o.promo_code ? ` (${o.promo_code})` : ""}</span>
+                                        <span className="tabular-nums">−{(o.discount ?? 0).toLocaleString("en-TZ")}</span>
+                                      </div>
+                                    )}
+                                    <div className="flex justify-between text-[rgb(var(--adm-fg)/var(--adm-a40))]">
                                       <span>Delivery</span><span className="tabular-nums">{o.delivery_fee.toLocaleString("en-TZ")}</span>
                                     </div>
-                                    <div className="flex justify-between text-white/80">
+                                    <div className="flex justify-between text-[rgb(var(--adm-fg)/var(--adm-a80))]">
                                       <span>Total</span><span className="tabular-nums">{o.total.toLocaleString("en-TZ")}</span>
                                     </div>
                                   </div>
@@ -1326,20 +1758,33 @@ export default function AdminPage() {
                                 {/* Contact / delivery */}
                                 <div className="space-y-3">
                                   <div>
-                                    <p className="text-[8px] tracking-[0.25em] uppercase text-white/25 mb-1">Contact</p>
-                                    <p className="text-xs text-white/60">{o.email || "—"}</p>
+                                    <p className="text-[8px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] mb-1">Contact</p>
+                                    <p className="text-xs text-[rgb(var(--adm-fg)/var(--adm-a60))]">{o.email || "—"}</p>
                                     <a
                                       href={`https://wa.me/${o.phone.replace(/\D/g, "").replace(/^0/, "255")}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-xs text-emerald-400/70 hover:text-emerald-400 transition-colors"
+                                      className="text-xs text-[rgb(var(--adm-emerald)/var(--adm-a70))] hover:text-[rgb(var(--adm-emerald))] transition-colors"
                                     >
                                       WhatsApp {o.phone}
                                     </a>
+                                    {(() => {
+                                      const update = statusUpdateLink(o);
+                                      return update ? (
+                                        <a
+                                          href={update.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="block mt-1.5 text-[10px] tracking-[0.15em] uppercase text-[rgb(var(--adm-sky)/var(--adm-a70))] hover:text-[rgb(var(--adm-sky))] transition-colors"
+                                        >
+                                          {update.label} ↗
+                                        </a>
+                                      ) : null;
+                                    })()}
                                   </div>
                                   <div>
-                                    <p className="text-[8px] tracking-[0.25em] uppercase text-white/25 mb-1">Delivery Note</p>
-                                    <p className="text-xs text-white/60">{o.delivery_note || "—"}</p>
+                                    <p className="text-[8px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] mb-1">Delivery Note</p>
+                                    <p className="text-xs text-[rgb(var(--adm-fg)/var(--adm-a60))]">{o.delivery_note || "—"}</p>
                                   </div>
                                 </div>
                               </div>
@@ -1350,7 +1795,7 @@ export default function AdminPage() {
                     ))}
                     {orders.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="px-4 py-20 text-center text-[9px] tracking-[0.3em] uppercase text-white/15">
+                        <td colSpan={7} className="px-4 py-20 text-center text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a15))]">
                           No orders yet
                         </td>
                       </tr>
@@ -1367,14 +1812,14 @@ export default function AdminPage() {
           <section>
             {/* Toolbar */}
             <div className="flex items-center justify-between mb-4">
-              <p className="text-[9px] tracking-[0.3em] uppercase text-white/25">
+              <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))]">
                 {visibleProducts.length === products.length
                   ? `${products.length} ${products.length === 1 ? "Product" : "Products"}`
                   : `${visibleProducts.length} of ${products.length}`}
               </p>
               <button
                 onClick={openAdd}
-                className="bg-white text-black text-[9px] tracking-[0.3em] uppercase px-5 py-2 font-bold hover:bg-white/90 transition-colors"
+                className="bg-[rgb(var(--adm-fg))] text-[var(--adm-bg)] text-[9px] tracking-[0.3em] uppercase px-5 py-2 font-bold hover:bg-[rgb(var(--adm-fg)/var(--adm-a90))] transition-colors"
               >
                 + ADD PRODUCT
               </button>
@@ -1382,8 +1827,8 @@ export default function AdminPage() {
 
             {/* Restock waitlist — customers waiting on sold-out products */}
             {restockRequests.length > 0 && (
-              <div className="border border-amber-400/20 p-4 mb-6">
-                <p className="text-[9px] tracking-[0.3em] uppercase text-amber-400/70 mb-3">
+              <div className="border border-[rgb(var(--adm-amber)/var(--adm-a20))] p-4 mb-6">
+                <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-amber)/var(--adm-a70))] mb-3">
                   Restock Waitlist · {restockRequests.length} {restockRequests.length === 1 ? "customer" : "customers"} waiting
                 </p>
                 <div className="space-y-2">
@@ -1395,21 +1840,21 @@ export default function AdminPage() {
                     );
                     return (
                       <div key={r.id} className="flex items-center gap-4 text-xs">
-                        <span className="text-white/70 flex-1 min-w-0 truncate">{name}</span>
+                        <span className="text-[rgb(var(--adm-fg)/var(--adm-a70))] flex-1 min-w-0 truncate">{name}</span>
                         <a
                           href={`https://wa.me/${waPhone(r.phone)}?text=${waText}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-emerald-400/70 hover:text-emerald-400 transition-colors whitespace-nowrap"
+                          className="text-[rgb(var(--adm-emerald)/var(--adm-a70))] hover:text-[rgb(var(--adm-emerald))] transition-colors whitespace-nowrap"
                         >
                           WhatsApp {r.phone}
                         </a>
-                        <span className="text-white/25 whitespace-nowrap hidden sm:inline">{formatOrderDate(r.created_at)}</span>
+                        <span className="text-[rgb(var(--adm-fg)/var(--adm-a25))] whitespace-nowrap hidden sm:inline">{formatOrderDate(r.created_at)}</span>
                         <button
                           onClick={() => handleClearRequest(r.id)}
                           disabled={restockClearing === r.id}
                           title="Notified — remove from waitlist"
-                          className="text-[9px] tracking-[0.2em] uppercase text-white/30 hover:text-white/70 transition-colors disabled:opacity-30"
+                          className="text-[9px] tracking-[0.2em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] hover:text-[rgb(var(--adm-fg)/var(--adm-a70))] transition-colors disabled:opacity-30"
                         >
                           {restockClearing === r.id ? "..." : "Done"}
                         </button>
@@ -1421,21 +1866,21 @@ export default function AdminPage() {
             )}
 
             {/* Filter bar */}
-            <div className="border border-white/[0.08] p-4 mb-6 space-y-3">
+            <div className="border border-[rgb(var(--adm-fg)/var(--adm-a08))] p-4 mb-6 space-y-3">
               {/* Search */}
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search products..."
-                className="w-full bg-transparent border border-white/15 text-white text-xs px-3 py-2 focus:outline-none focus:border-white/40 transition-colors placeholder:text-white/20"
+                className="w-full bg-transparent border border-[rgb(var(--adm-fg)/var(--adm-a15))] text-[rgb(var(--adm-fg))] text-xs px-3 py-2 focus:outline-none focus:border-[rgb(var(--adm-fg)/var(--adm-a40))] transition-colors placeholder:text-[rgb(var(--adm-fg)/var(--adm-a20))]"
               />
 
               {/* Pills row */}
               <div className="flex flex-wrap gap-4">
                 {/* Category */}
                 <div className="flex items-center gap-2">
-                  <span className="text-[8px] tracking-[0.25em] uppercase text-white/20 shrink-0">Category</span>
+                  <span className="text-[8px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a20))] shrink-0">Category</span>
                   <div className="flex gap-1">
                     {(["all", "Men", "Women", "Accessories"] as const).map((v) => (
                       <button
@@ -1443,8 +1888,8 @@ export default function AdminPage() {
                         onClick={() => setFilterCategory(v)}
                         className={`text-[8px] tracking-[0.2em] uppercase px-2.5 py-1 transition-colors border ${
                           filterCategory === v
-                            ? "border-white/60 text-white bg-white/10"
-                            : "border-white/15 text-white/30 hover:border-white/30 hover:text-white/50"
+                            ? "border-[rgb(var(--adm-fg)/var(--adm-a60))] text-[rgb(var(--adm-fg))] bg-[rgb(var(--adm-fg)/var(--adm-a10))]"
+                            : "border-[rgb(var(--adm-fg)/var(--adm-a15))] text-[rgb(var(--adm-fg)/var(--adm-a30))] hover:border-[rgb(var(--adm-fg)/var(--adm-a30))] hover:text-[rgb(var(--adm-fg)/var(--adm-a50))]"
                         }`}
                       >
                         {v === "all" ? "All" : v}
@@ -1455,7 +1900,7 @@ export default function AdminPage() {
 
                 {/* Status */}
                 <div className="flex items-center gap-2">
-                  <span className="text-[8px] tracking-[0.25em] uppercase text-white/20 shrink-0">Status</span>
+                  <span className="text-[8px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a20))] shrink-0">Status</span>
                   <div className="flex gap-1">
                     {([["all", "All"], ["live", "Live"], ["coming-soon", "Coming Soon"], ["out-of-stock", "Out of Stock"]] as const).map(([v, label]) => (
                       <button
@@ -1463,8 +1908,8 @@ export default function AdminPage() {
                         onClick={() => setFilterStatus(v)}
                         className={`text-[8px] tracking-[0.2em] uppercase px-2.5 py-1 transition-colors border ${
                           filterStatus === v
-                            ? "border-white/60 text-white bg-white/10"
-                            : "border-white/15 text-white/30 hover:border-white/30 hover:text-white/50"
+                            ? "border-[rgb(var(--adm-fg)/var(--adm-a60))] text-[rgb(var(--adm-fg))] bg-[rgb(var(--adm-fg)/var(--adm-a10))]"
+                            : "border-[rgb(var(--adm-fg)/var(--adm-a15))] text-[rgb(var(--adm-fg)/var(--adm-a30))] hover:border-[rgb(var(--adm-fg)/var(--adm-a30))] hover:text-[rgb(var(--adm-fg)/var(--adm-a50))]"
                         }`}
                       >
                         {label}
@@ -1475,7 +1920,7 @@ export default function AdminPage() {
 
                 {/* Badge */}
                 <div className="flex items-center gap-2">
-                  <span className="text-[8px] tracking-[0.25em] uppercase text-white/20 shrink-0">Badge</span>
+                  <span className="text-[8px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a20))] shrink-0">Badge</span>
                   <div className="flex gap-1">
                     {([["all", "All"], ["New", "New"], ["Best Seller", "Best Seller"], ["none", "None"]] as const).map(([v, label]) => (
                       <button
@@ -1483,8 +1928,8 @@ export default function AdminPage() {
                         onClick={() => setFilterBadge(v)}
                         className={`text-[8px] tracking-[0.2em] uppercase px-2.5 py-1 transition-colors border ${
                           filterBadge === v
-                            ? "border-white/60 text-white bg-white/10"
-                            : "border-white/15 text-white/30 hover:border-white/30 hover:text-white/50"
+                            ? "border-[rgb(var(--adm-fg)/var(--adm-a60))] text-[rgb(var(--adm-fg))] bg-[rgb(var(--adm-fg)/var(--adm-a10))]"
+                            : "border-[rgb(var(--adm-fg)/var(--adm-a15))] text-[rgb(var(--adm-fg)/var(--adm-a30))] hover:border-[rgb(var(--adm-fg)/var(--adm-a30))] hover:text-[rgb(var(--adm-fg)/var(--adm-a50))]"
                         }`}
                       >
                         {label}
@@ -1497,7 +1942,7 @@ export default function AdminPage() {
                 {(search || filterCategory !== "all" || filterStatus !== "all" || filterBadge !== "all") && (
                   <button
                     onClick={() => { setSearch(""); setFilterCategory("all"); setFilterStatus("all"); setFilterBadge("all"); }}
-                    className="text-[8px] tracking-[0.2em] uppercase text-white/25 hover:text-white/50 transition-colors ml-auto"
+                    className="text-[8px] tracking-[0.2em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] hover:text-[rgb(var(--adm-fg)/var(--adm-a50))] transition-colors ml-auto"
                   >
                     Clear filters
                   </button>
@@ -1505,25 +1950,25 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {actionError && <p className="text-red-400/80 text-[10px] tracking-wider mb-4">{actionError}</p>}
+            {actionError && <p className="text-[rgb(var(--adm-red)/var(--adm-a80))] text-[10px] tracking-wider mb-4">{actionError}</p>}
 
             {loading ? (
-              <div className="border border-white/[0.08] py-24 text-center text-[9px] tracking-[0.3em] uppercase text-white/20">Loading...</div>
+              <div className="border border-[rgb(var(--adm-fg)/var(--adm-a08))] py-24 text-center text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a20))]">Loading...</div>
             ) : (
-              <div className="border border-white/[0.08] overflow-x-auto">
+              <div className="border border-[rgb(var(--adm-fg)/var(--adm-a08))] overflow-x-auto">
                 <table className="w-full min-w-[700px]">
                   <thead>
-                    <tr className="border-b border-white/[0.08]">
+                    <tr className="border-b border-[rgb(var(--adm-fg)/var(--adm-a08))]">
                       {["", "Name", "Category", "Price (TZS)", "Stock", "Badge", "Status", ""].map((h, i) => (
-                        <th key={i} className="text-left text-[9px] tracking-[0.25em] uppercase text-white/25 px-4 py-3 font-normal">{h}</th>
+                        <th key={i} className="text-left text-[9px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] px-4 py-3 font-normal">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {visibleProducts.map((p, rowIdx) => (
-                      <tr key={p.id} className="border-b border-white/[0.04] hover:bg-white/[0.015] transition-colors group">
+                      <tr key={p.id} className="border-b border-[rgb(var(--adm-fg)/var(--adm-a04))] hover:bg-[rgb(var(--adm-fg)/var(--adm-a015))] transition-colors group">
                         <td className="px-4 py-3 w-14">
-                          <div className="w-10 h-10 bg-white/5 border border-white/10 overflow-hidden flex-shrink-0">
+                          <div className="w-10 h-10 bg-[rgb(var(--adm-fg)/var(--adm-a05))] border border-[rgb(var(--adm-fg)/var(--adm-a10))] overflow-hidden flex-shrink-0">
                             {p.images[0] && (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover" />
@@ -1531,56 +1976,69 @@ export default function AdminPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <p className="text-sm text-white">{p.name}</p>
-                          <p className="text-[9px] text-white/25 mt-0.5 font-mono">{p.id}</p>
+                          <p className="text-sm text-[rgb(var(--adm-fg))]">{p.name}</p>
+                          <p className="text-[9px] text-[rgb(var(--adm-fg)/var(--adm-a25))] mt-0.5 font-mono">{p.id}</p>
                           {(p.colors?.length ?? 0) > 0 && (
                             <div className="flex gap-1 mt-1">
                               {p.colors!.map((c) => (
-                                <div key={c.name} title={c.name} className="w-3 h-3 rounded-full border border-white/20" style={{ backgroundColor: c.hex }} />
+                                <div key={c.name} title={c.name} className="w-3 h-3 rounded-full border border-[rgb(var(--adm-fg)/var(--adm-a20))]" style={{ backgroundColor: c.hex }} />
                               ))}
                             </div>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-xs text-white/50">{p.category}</td>
+                        <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a50))]">{p.category}</td>
                         <td className="px-4 py-3 text-xs tabular-nums">
                           {p.salePrice != null ? (
                             <>
-                              <span className="text-red-400/80">{p.salePrice.toLocaleString("en-TZ")}</span>
-                              <span className="text-white/25 line-through ml-2">{p.price.toLocaleString("en-TZ")}</span>
+                              <span className="text-[rgb(var(--adm-red)/var(--adm-a80))]">{p.salePrice.toLocaleString("en-TZ")}</span>
+                              <span className="text-[rgb(var(--adm-fg)/var(--adm-a25))] line-through ml-2">{p.price.toLocaleString("en-TZ")}</span>
                             </>
                           ) : (
-                            <span className="text-white/50">{p.price.toLocaleString("en-TZ")}</span>
+                            <span className="text-[rgb(var(--adm-fg)/var(--adm-a50))]">{p.price.toLocaleString("en-TZ")}</span>
+                          )}
+                          {p.costPrice != null ? (
+                            (() => {
+                              const margin = effectivePrice(p) - p.costPrice!;
+                              return (
+                                <p className={`text-[9px] mt-0.5 ${margin < 0 ? "text-[rgb(var(--adm-red)/var(--adm-a80))]" : "text-[rgb(var(--adm-fg)/var(--adm-a25))]"}`}>
+                                  cost {p.costPrice!.toLocaleString("en-TZ")} · {margin < 0 ? "loss" : "margin"}{" "}
+                                  {Math.abs(margin).toLocaleString("en-TZ")}
+                                </p>
+                              );
+                            })()
+                          ) : (
+                            <p className="text-[9px] text-[rgb(var(--adm-amber)/var(--adm-a50))] mt-0.5">no buying price</p>
                           )}
                         </td>
                         <td className="px-4 py-3">
                           {(p.stock ?? 0) === 0 ? (
-                            <span className="text-[9px] tracking-wider uppercase text-red-400/70">Out</span>
+                            <span className="text-[9px] tracking-wider uppercase text-[rgb(var(--adm-red)/var(--adm-a70))]">Out</span>
                           ) : (
-                            <span className={`text-xs tabular-nums ${(p.stock ?? 0) <= 5 ? "text-amber-400/80" : "text-white/50"}`}>
+                            <span className={`text-xs tabular-nums ${(p.stock ?? 0) <= 5 ? "text-[rgb(var(--adm-amber)/var(--adm-a80))]" : "text-[rgb(var(--adm-fg)/var(--adm-a50))]"}`}>
                               {p.stock}
                             </span>
                           )}
                           {(() => {
                             const waiting = restockRequests.filter((r) => r.product_id === p.id).length;
                             return waiting > 0 ? (
-                              <p className="text-[9px] text-amber-400/50 mt-0.5">{waiting} waiting</p>
+                              <p className="text-[9px] text-[rgb(var(--adm-amber)/var(--adm-a50))] mt-0.5">{waiting} waiting</p>
                             ) : null;
                           })()}
                         </td>
                         <td className="px-4 py-3">
                           {p.badge ? (
-                            <span className="text-[9px] tracking-wider uppercase border border-white/20 px-2 py-0.5 text-white/50">{p.badge}</span>
+                            <span className="text-[9px] tracking-wider uppercase border border-[rgb(var(--adm-fg)/var(--adm-a20))] px-2 py-0.5 text-[rgb(var(--adm-fg)/var(--adm-a50))]">{p.badge}</span>
                           ) : (
-                            <span className="text-white/15">—</span>
+                            <span className="text-[rgb(var(--adm-fg)/var(--adm-a15))]">—</span>
                           )}
                         </td>
                         <td className="px-4 py-3">
                           {p.isComingSoon && p.preorder ? (
-                            <span className="text-[9px] tracking-wider uppercase text-sky-400/70">Pre-Order</span>
+                            <span className="text-[9px] tracking-wider uppercase text-[rgb(var(--adm-sky)/var(--adm-a70))]">Pre-Order</span>
                           ) : p.isComingSoon ? (
-                            <span className="text-[9px] tracking-wider uppercase text-amber-400/60">Coming Soon</span>
+                            <span className="text-[9px] tracking-wider uppercase text-[rgb(var(--adm-amber)/var(--adm-a60))]">Coming Soon</span>
                           ) : (
-                            <span className="text-[9px] tracking-wider uppercase text-emerald-400/60">Live</span>
+                            <span className="text-[9px] tracking-wider uppercase text-[rgb(var(--adm-emerald)/var(--adm-a60))]">Live</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-right">
@@ -1591,7 +2049,7 @@ export default function AdminPage() {
                                   onClick={() => handleMove(rowIdx, -1)}
                                   disabled={rowIdx === 0}
                                   aria-label={`Move ${p.name} up`}
-                                  className="text-white/30 hover:text-white transition-colors disabled:opacity-20 disabled:hover:text-white/30 px-1"
+                                  className="text-[rgb(var(--adm-fg)/var(--adm-a30))] hover:text-[rgb(var(--adm-fg))] transition-colors disabled:opacity-20 disabled:hover:text-[rgb(var(--adm-fg)/var(--adm-a30))] px-1"
                                 >
                                   ↑
                                 </button>
@@ -1599,17 +2057,17 @@ export default function AdminPage() {
                                   onClick={() => handleMove(rowIdx, 1)}
                                   disabled={rowIdx === visibleProducts.length - 1}
                                   aria-label={`Move ${p.name} down`}
-                                  className="text-white/30 hover:text-white transition-colors disabled:opacity-20 disabled:hover:text-white/30 px-1"
+                                  className="text-[rgb(var(--adm-fg)/var(--adm-a30))] hover:text-[rgb(var(--adm-fg))] transition-colors disabled:opacity-20 disabled:hover:text-[rgb(var(--adm-fg)/var(--adm-a30))] px-1"
                                 >
                                   ↓
                                 </button>
                               </span>
                             )}
-                            <button onClick={() => openEdit(p)} className="text-[9px] tracking-[0.2em] uppercase text-white/40 hover:text-white transition-colors">EDIT</button>
+                            <button onClick={() => openEdit(p)} className="text-[9px] tracking-[0.2em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a40))] hover:text-[rgb(var(--adm-fg))] transition-colors">EDIT</button>
                             <button
                               onClick={() => handleDelete(p.id, p.name)}
                               disabled={deletingId === p.id}
-                              className="text-[9px] tracking-[0.2em] uppercase text-red-400/50 hover:text-red-400 transition-colors disabled:opacity-30"
+                              className="text-[9px] tracking-[0.2em] uppercase text-[rgb(var(--adm-red)/var(--adm-a50))] hover:text-[rgb(var(--adm-red))] transition-colors disabled:opacity-30"
                             >
                               {deletingId === p.id ? "..." : "DELETE"}
                             </button>
@@ -1619,7 +2077,7 @@ export default function AdminPage() {
                     ))}
                     {visibleProducts.length === 0 && (
                       <tr>
-                        <td colSpan={8} className="px-4 py-20 text-center text-[9px] tracking-[0.3em] uppercase text-white/15">
+                        <td colSpan={8} className="px-4 py-20 text-center text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a15))]">
                           {products.length === 0 ? "No products yet" : "No products match the current filters"}
                         </td>
                       </tr>
@@ -1633,48 +2091,48 @@ export default function AdminPage() {
         {/* ── Reviews ───────────────────────────────────────────────────────── */}
         {activeTab === "reviews" && (
           <section>
-            <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-2">
+            <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] mb-2">
               Customer Reviews
-              {pendingReviews > 0 && <span className="text-amber-400/60 ml-2 normal-case tracking-normal">· {pendingReviews} awaiting approval</span>}
+              {pendingReviews > 0 && <span className="text-[rgb(var(--adm-amber)/var(--adm-a60))] ml-2 normal-case tracking-normal">· {pendingReviews} awaiting approval</span>}
             </p>
-            <p className="text-[9px] text-white/20 mb-8">Reviews only appear on the product page after you approve them.</p>
+            <p className="text-[9px] text-[rgb(var(--adm-fg)/var(--adm-a20))] mb-8">Reviews only appear on the product page after you approve them.</p>
 
-            {reviewsError && <p className="text-red-400/80 text-[10px] tracking-wider mb-4">{reviewsError}</p>}
+            {reviewsError && <p className="text-[rgb(var(--adm-red)/var(--adm-a80))] text-[10px] tracking-wider mb-4">{reviewsError}</p>}
 
             {reviewsLoading ? (
-              <div className="border border-white/[0.08] py-24 text-center text-[9px] tracking-[0.3em] uppercase text-white/20">Loading...</div>
+              <div className="border border-[rgb(var(--adm-fg)/var(--adm-a08))] py-24 text-center text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a20))]">Loading...</div>
             ) : reviews.length === 0 ? (
-              <div className="border border-white/[0.08] py-24 text-center text-[9px] tracking-[0.3em] uppercase text-white/15">No reviews yet</div>
+              <div className="border border-[rgb(var(--adm-fg)/var(--adm-a08))] py-24 text-center text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a15))]">No reviews yet</div>
             ) : (
               <div className="space-y-3">
                 {reviews.map((r) => {
                   const product = products.find((p) => p.id === r.product_id);
                   return (
-                    <div key={r.id} className={`border p-5 ${r.approved ? "border-white/[0.08]" : "border-amber-400/25"}`}>
+                    <div key={r.id} className={`border p-5 ${r.approved ? "border-[rgb(var(--adm-fg)/var(--adm-a08))]" : "border-[rgb(var(--adm-amber)/var(--adm-a25))]"}`}>
                       <div className="flex items-start justify-between gap-4 mb-2">
                         <div>
-                          <p className="text-xs text-white/80">
+                          <p className="text-xs text-[rgb(var(--adm-fg)/var(--adm-a80))]">
                             {r.author}
-                            <span className="text-white/25 ml-2">on {product?.name ?? r.product_id}</span>
+                            <span className="text-[rgb(var(--adm-fg)/var(--adm-a25))] ml-2">on {product?.name ?? r.product_id}</span>
                           </p>
-                          <p className="text-amber-400/80 text-xs tracking-[0.2em] mt-1" aria-label={`${r.rating} out of 5 stars`}>
-                            {"★".repeat(r.rating)}<span className="text-white/15">{"★".repeat(5 - r.rating)}</span>
+                          <p className="text-[rgb(var(--adm-amber)/var(--adm-a80))] text-xs tracking-[0.2em] mt-1" aria-label={`${r.rating} out of 5 stars`}>
+                            {"★".repeat(r.rating)}<span className="text-[rgb(var(--adm-fg)/var(--adm-a15))]">{"★".repeat(5 - r.rating)}</span>
                           </p>
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
-                          <span className={`text-[9px] tracking-wider uppercase ${r.approved ? "text-emerald-400/60" : "text-amber-400/70"}`}>
+                          <span className={`text-[9px] tracking-wider uppercase ${r.approved ? "text-[rgb(var(--adm-emerald)/var(--adm-a60))]" : "text-[rgb(var(--adm-amber)/var(--adm-a70))]"}`}>
                             {r.approved ? "Live" : "Pending"}
                           </span>
-                          <span className="text-[9px] text-white/20 hidden sm:inline">{formatOrderDate(r.created_at)}</span>
+                          <span className="text-[9px] text-[rgb(var(--adm-fg)/var(--adm-a20))] hidden sm:inline">{formatOrderDate(r.created_at)}</span>
                         </div>
                       </div>
 
-                      <p className="text-xs text-white/50 leading-relaxed mb-3">{r.body}</p>
+                      <p className="text-xs text-[rgb(var(--adm-fg)/var(--adm-a50))] leading-relaxed mb-3">{r.body}</p>
 
                       {r.photo_url && (
                         <a href={r.photo_url} target="_blank" rel="noopener noreferrer" className="inline-block mb-3">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={r.photo_url} alt="Review photo" className="w-16 h-16 object-cover border border-white/15" />
+                          <img src={r.photo_url} alt="Review photo" className="w-16 h-16 object-cover border border-[rgb(var(--adm-fg)/var(--adm-a15))]" />
                         </a>
                       )}
 
@@ -1683,7 +2141,7 @@ export default function AdminPage() {
                           onClick={() => handleReviewApprove(r.id, !r.approved)}
                           disabled={reviewActing === r.id}
                           className={`text-[9px] tracking-[0.2em] uppercase transition-colors disabled:opacity-30 ${
-                            r.approved ? "text-white/30 hover:text-white/60" : "text-emerald-400/70 hover:text-emerald-400"
+                            r.approved ? "text-[rgb(var(--adm-fg)/var(--adm-a30))] hover:text-[rgb(var(--adm-fg)/var(--adm-a60))]" : "text-[rgb(var(--adm-emerald)/var(--adm-a70))] hover:text-[rgb(var(--adm-emerald))]"
                           }`}
                         >
                           {reviewActing === r.id ? "..." : r.approved ? "Unpublish" : "Approve"}
@@ -1691,7 +2149,7 @@ export default function AdminPage() {
                         <button
                           onClick={() => handleReviewDelete(r.id)}
                           disabled={reviewActing === r.id}
-                          className="text-[9px] tracking-[0.2em] uppercase text-red-400/50 hover:text-red-400 transition-colors disabled:opacity-30"
+                          className="text-[9px] tracking-[0.2em] uppercase text-[rgb(var(--adm-red)/var(--adm-a50))] hover:text-[rgb(var(--adm-red))] transition-colors disabled:opacity-30"
                         >
                           Delete
                         </button>
@@ -1704,40 +2162,228 @@ export default function AdminPage() {
           </section>
         )}
 
+        {/* ── Promo Codes ───────────────────────────────────────────────────── */}
+        {activeTab === "promos" && (
+          <section>
+            <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] mb-2">Create Promo Code</p>
+            <p className="text-[9px] text-[rgb(var(--adm-fg)/var(--adm-a20))] mb-4">Customers enter the code at checkout. Percent codes take a share of the subtotal; fixed codes take a flat TZS amount.</p>
+            <form onSubmit={handleCreatePromo} className="border border-[rgb(var(--adm-fg)/var(--adm-a10))] p-5 mb-10">
+              <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+                <div className="col-span-2 lg:col-span-1">
+                  <label className="block text-[8px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] mb-1.5">Code</label>
+                  <input
+                    type="text"
+                    value={promoForm.code}
+                    onChange={(e) => setPromoForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
+                    placeholder="KARIBU10"
+                    required
+                    className="w-full bg-transparent border border-[rgb(var(--adm-fg)/var(--adm-a20))] text-[rgb(var(--adm-fg))] px-3 py-2.5 text-sm focus:outline-none focus:border-[rgb(var(--adm-fg)/var(--adm-a60))] transition-colors placeholder:text-[rgb(var(--adm-fg)/var(--adm-a20))] uppercase tracking-widest"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[8px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] mb-1.5">Type</label>
+                  <select
+                    value={promoForm.type}
+                    onChange={(e) => setPromoForm((f) => ({ ...f, type: e.target.value as PromoCode["discount_type"] }))}
+                    className="w-full bg-[var(--adm-bg2)] border border-[rgb(var(--adm-fg)/var(--adm-a20))] text-[rgb(var(--adm-fg))] px-3 py-2.5 text-sm focus:outline-none focus:border-[rgb(var(--adm-fg)/var(--adm-a60))] transition-colors cursor-pointer"
+                  >
+                    <option value="percent">% off</option>
+                    <option value="fixed">TZS off</option>
+                    <option value="free_delivery">Free delivery</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[8px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] mb-1.5">
+                    {promoForm.type === "percent" ? "Percent" : promoForm.type === "fixed" ? "Amount (TZS)" : "Amount"}
+                  </label>
+                  <input
+                    type="number"
+                    value={promoForm.type === "free_delivery" ? "" : promoForm.value}
+                    onChange={(e) => setPromoForm((f) => ({ ...f, value: e.target.value }))}
+                    placeholder={promoForm.type === "percent" ? "10" : promoForm.type === "fixed" ? "5000" : "—"}
+                    min={1}
+                    max={promoForm.type === "percent" ? 100 : undefined}
+                    required={promoForm.type !== "free_delivery"}
+                    disabled={promoForm.type === "free_delivery"}
+                    className="w-full bg-transparent border border-[rgb(var(--adm-fg)/var(--adm-a20))] text-[rgb(var(--adm-fg))] px-3 py-2.5 text-sm focus:outline-none focus:border-[rgb(var(--adm-fg)/var(--adm-a60))] transition-colors placeholder:text-[rgb(var(--adm-fg)/var(--adm-a20))] disabled:opacity-40"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[8px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] mb-1.5">Min Order (TZS)</label>
+                  <input
+                    type="number"
+                    value={promoForm.minSubtotal}
+                    onChange={(e) => setPromoForm((f) => ({ ...f, minSubtotal: e.target.value }))}
+                    placeholder="0"
+                    min={0}
+                    className="w-full bg-transparent border border-[rgb(var(--adm-fg)/var(--adm-a20))] text-[rgb(var(--adm-fg))] px-3 py-2.5 text-sm focus:outline-none focus:border-[rgb(var(--adm-fg)/var(--adm-a60))] transition-colors placeholder:text-[rgb(var(--adm-fg)/var(--adm-a20))]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[8px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] mb-1.5">Max Uses</label>
+                  <input
+                    type="number"
+                    value={promoForm.maxUses}
+                    onChange={(e) => setPromoForm((f) => ({ ...f, maxUses: e.target.value }))}
+                    placeholder="Unlimited"
+                    min={1}
+                    className="w-full bg-transparent border border-[rgb(var(--adm-fg)/var(--adm-a20))] text-[rgb(var(--adm-fg))] px-3 py-2.5 text-sm focus:outline-none focus:border-[rgb(var(--adm-fg)/var(--adm-a60))] transition-colors placeholder:text-[rgb(var(--adm-fg)/var(--adm-a20))]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[8px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] mb-1.5">Expires</label>
+                  <input
+                    type="date"
+                    value={promoForm.expiresAt}
+                    onChange={(e) => setPromoForm((f) => ({ ...f, expiresAt: e.target.value }))}
+                    className="w-full bg-transparent border border-[rgb(var(--adm-fg)/var(--adm-a20))] text-[rgb(var(--adm-fg))] px-3 py-2.5 text-sm focus:outline-none focus:border-[rgb(var(--adm-fg)/var(--adm-a60))] transition-colors"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-4 mt-4">
+                <button
+                  type="submit"
+                  disabled={promoSaving}
+                  className="bg-[rgb(var(--adm-fg))] text-[var(--adm-bg)] text-[9px] tracking-[0.3em] uppercase px-6 py-2.5 font-bold hover:bg-[rgb(var(--adm-fg)/var(--adm-a90))] transition-colors disabled:opacity-40"
+                >
+                  {promoSaving ? "Creating..." : "Create Code"}
+                </button>
+                {promosError && <p className="text-[rgb(var(--adm-red)/var(--adm-a80))] text-[10px] tracking-wider">{promosError}</p>}
+              </div>
+            </form>
+
+            <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] mb-2">Welcome Offer</p>
+            <p className="text-[9px] text-[rgb(var(--adm-fg)/var(--adm-a20))] mb-4">Shown to customers right after they join the email list — pick a code to turn the sign-up form into a first-order offer.</p>
+            <div className="border border-[rgb(var(--adm-fg)/var(--adm-a10))] p-5 mb-10">
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                <select
+                  value={welcomePromo}
+                  onChange={(e) => setWelcomePromo(e.target.value)}
+                  className="flex-1 bg-[var(--adm-bg2)] border border-[rgb(var(--adm-fg)/var(--adm-a20))] text-[rgb(var(--adm-fg))] px-3 py-2.5 text-sm focus:outline-none focus:border-[rgb(var(--adm-fg)/var(--adm-a60))] transition-colors cursor-pointer"
+                >
+                  <option value="">No welcome offer</option>
+                  {promos.filter((p) => p.active).map((p) => (
+                    <option key={p.code} value={p.code}>{p.code} — {promoLabel(p)}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleSaveWelcome}
+                  disabled={welcomeSaving}
+                  className="bg-[rgb(var(--adm-fg))] text-[var(--adm-bg)] text-[9px] tracking-[0.3em] uppercase px-6 py-2.5 font-bold hover:bg-[rgb(var(--adm-fg)/var(--adm-a90))] transition-colors disabled:opacity-40 shrink-0"
+                >
+                  {welcomeSaving ? "Saving..." : welcomeSaved ? "Saved ✓" : "Save"}
+                </button>
+              </div>
+              {welcomeError && <p className="text-[rgb(var(--adm-red)/var(--adm-a80))] text-[10px] tracking-wider mt-2">{welcomeError}</p>}
+            </div>
+
+            <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] mb-6">
+              {promos.length} {promos.length === 1 ? "Code" : "Codes"}
+            </p>
+            {promosLoading ? (
+              <div className="border border-[rgb(var(--adm-fg)/var(--adm-a08))] py-24 text-center text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a20))]">Loading...</div>
+            ) : (
+              <div className="border border-[rgb(var(--adm-fg)/var(--adm-a08))] overflow-x-auto">
+                <table className="w-full min-w-[720px]">
+                  <thead>
+                    <tr className="border-b border-[rgb(var(--adm-fg)/var(--adm-a08))]">
+                      {["Code", "Discount", "Min Order", "Uses", "Expires", "Status", ""].map((h, i) => (
+                        <th key={i} className="text-left text-[9px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] px-4 py-3 font-normal">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {promos.map((p) => {
+                      const expired = p.expires_at != null && new Date(p.expires_at).getTime() < Date.now();
+                      const usedUp = p.max_uses != null && p.use_count >= p.max_uses;
+                      return (
+                        <tr key={p.code} className="border-b border-[rgb(var(--adm-fg)/var(--adm-a04))] hover:bg-[rgb(var(--adm-fg)/var(--adm-a015))] transition-colors">
+                          <td className="px-4 py-3 text-xs font-mono text-[rgb(var(--adm-fg))]">{p.code}</td>
+                          <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a80))]">{promoLabel(p)}</td>
+                          <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a50))] tabular-nums">
+                            {p.min_subtotal > 0 ? p.min_subtotal.toLocaleString("en-TZ") : "—"}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a50))] tabular-nums">
+                            {p.use_count}{p.max_uses != null ? ` / ${p.max_uses}` : ""}
+                            {usedUp && <span className="text-[rgb(var(--adm-amber)/var(--adm-a70))] ml-1.5">full</span>}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a50))] whitespace-nowrap">
+                            {p.expires_at ? formatOrderDate(p.expires_at) : "—"}
+                            {expired && <span className="text-[rgb(var(--adm-red)/var(--adm-a60))] ml-1.5">expired</span>}
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => handleTogglePromo(p)}
+                              disabled={promoActing === p.code}
+                              className={`text-[9px] tracking-[0.15em] uppercase border px-2.5 py-1.5 transition-colors disabled:opacity-40 ${
+                                p.active
+                                  ? "text-[rgb(var(--adm-emerald)/var(--adm-a80))] border-[rgb(var(--adm-emerald)/var(--adm-a30))] hover:border-[rgb(var(--adm-emerald)/var(--adm-a60))]"
+                                  : "text-[rgb(var(--adm-fg)/var(--adm-a30))] border-[rgb(var(--adm-fg)/var(--adm-a15))] hover:border-[rgb(var(--adm-fg)/var(--adm-a35))]"
+                              }`}
+                            >
+                              {p.active ? "Active" : "Off"}
+                            </button>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              onClick={() => handleDeletePromo(p.code)}
+                              disabled={promoActing === p.code}
+                              className="text-[9px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] hover:text-[rgb(var(--adm-red)/var(--adm-a70))] transition-colors disabled:opacity-40"
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {promos.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-20 text-center text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a15))]">
+                          No promo codes yet
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
+
         {/* ── Site & Banners ────────────────────────────────────────────────── */}
         {activeTab === "hero" && (
           <section>
-            <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-2">Order Alerts</p>
-            <p className="text-[9px] text-white/20 mb-4">Get a notification on this device the moment a new order comes in — even with the dashboard closed.</p>
-            <div className="border border-white/10 p-5 mb-10 flex flex-wrap items-center gap-4">
+            <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] mb-2">Order Alerts</p>
+            <p className="text-[9px] text-[rgb(var(--adm-fg)/var(--adm-a20))] mb-4">Get a notification on this device the moment a new order comes in — even with the dashboard closed.</p>
+            <div className="border border-[rgb(var(--adm-fg)/var(--adm-a10))] p-5 mb-10 flex flex-wrap items-center gap-4">
               {pushState === "enabled" ? (
-                <p className="text-xs text-emerald-400/70">✓ Alerts are on for this device</p>
+                <p className="text-xs text-[rgb(var(--adm-emerald)/var(--adm-a70))]">✓ Alerts are on for this device</p>
               ) : pushState === "unsupported" ? (
-                <p className="text-xs text-white/40">This browser doesn&apos;t support push notifications.</p>
+                <p className="text-xs text-[rgb(var(--adm-fg)/var(--adm-a40))]">This browser doesn&apos;t support push notifications.</p>
               ) : pushState === "denied" ? (
-                <p className="text-xs text-amber-400/70">Notifications are blocked — allow them for this site in your browser settings, then try again.</p>
+                <p className="text-xs text-[rgb(var(--adm-amber)/var(--adm-a70))]">Notifications are blocked — allow them for this site in your browser settings, then try again.</p>
               ) : (
                 <button
                   onClick={handleEnablePush}
                   disabled={pushState === "enabling"}
-                  className="bg-white text-black text-[9px] tracking-[0.3em] uppercase px-6 py-2.5 font-bold hover:bg-white/90 transition-colors disabled:opacity-40"
+                  className="bg-[rgb(var(--adm-fg))] text-[var(--adm-bg)] text-[9px] tracking-[0.3em] uppercase px-6 py-2.5 font-bold hover:bg-[rgb(var(--adm-fg)/var(--adm-a90))] transition-colors disabled:opacity-40"
                 >
                   {pushState === "enabling" ? "Enabling..." : "Enable Alerts on This Device"}
                 </button>
               )}
               {pushDevices !== null && (
-                <p className="text-[10px] text-white/25">
+                <p className="text-[10px] text-[rgb(var(--adm-fg)/var(--adm-a25))]">
                   {pushDevices} {pushDevices === 1 ? "device" : "devices"} subscribed
                 </p>
               )}
               {pushState === "error" && pushError && (
-                <p className="text-red-400/80 text-[10px] tracking-wider w-full">{pushError}</p>
+                <p className="text-[rgb(var(--adm-red)/var(--adm-a80))] text-[10px] tracking-wider w-full">{pushError}</p>
               )}
             </div>
 
-            <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-2">Announcement Bar</p>
-            <p className="text-[9px] text-white/20 mb-4">Shown at the very top of every page. Leave empty to hide the bar.</p>
-            <div className="border border-white/10 p-5 mb-10">
+            <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] mb-2">Announcement Bar</p>
+            <p className="text-[9px] text-[rgb(var(--adm-fg)/var(--adm-a20))] mb-4">Shown at the very top of every page. Leave empty to hide the bar.</p>
+            <div className="border border-[rgb(var(--adm-fg)/var(--adm-a10))] p-5 mb-10">
               <div className="flex flex-col sm:flex-row gap-3">
                 <input
                   type="text"
@@ -1745,49 +2391,49 @@ export default function AdminPage() {
                   onChange={(e) => setAnnouncement(e.target.value)}
                   maxLength={120}
                   placeholder="e.g. Free delivery on orders above TZS 150,000"
-                  className="flex-1 bg-transparent border border-white/20 text-white px-3 py-2.5 text-sm focus:outline-none focus:border-white/60 transition-colors placeholder:text-white/20"
+                  className="flex-1 bg-transparent border border-[rgb(var(--adm-fg)/var(--adm-a20))] text-[rgb(var(--adm-fg))] px-3 py-2.5 text-sm focus:outline-none focus:border-[rgb(var(--adm-fg)/var(--adm-a60))] transition-colors placeholder:text-[rgb(var(--adm-fg)/var(--adm-a20))]"
                 />
                 <button
                   onClick={handleSaveAnnouncement}
                   disabled={announcementSaving}
-                  className="bg-white text-black text-[9px] tracking-[0.3em] uppercase px-6 py-2.5 font-bold hover:bg-white/90 transition-colors disabled:opacity-40 shrink-0"
+                  className="bg-[rgb(var(--adm-fg))] text-[var(--adm-bg)] text-[9px] tracking-[0.3em] uppercase px-6 py-2.5 font-bold hover:bg-[rgb(var(--adm-fg)/var(--adm-a90))] transition-colors disabled:opacity-40 shrink-0"
                 >
                   {announcementSaving ? "Saving..." : announcementSaved ? "Saved ✓" : "Save"}
                 </button>
               </div>
-              {announcementError && <p className="text-red-400/80 text-[10px] tracking-wider mt-2">{announcementError}</p>}
+              {announcementError && <p className="text-[rgb(var(--adm-red)/var(--adm-a80))] text-[10px] tracking-wider mt-2">{announcementError}</p>}
             </div>
 
-            <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-2">Email Subscribers</p>
-            <p className="text-[9px] text-white/20 mb-4">Sign-ups from the footer form and checkout opt-in. Copy the list into your email tool&apos;s BCC field to send a campaign.</p>
-            <div className="border border-white/10 p-5 mb-10">
+            <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] mb-2">Email Subscribers</p>
+            <p className="text-[9px] text-[rgb(var(--adm-fg)/var(--adm-a20))] mb-4">Sign-ups from the footer form and checkout opt-in. Copy the list into your email tool&apos;s BCC field to send a campaign.</p>
+            <div className="border border-[rgb(var(--adm-fg)/var(--adm-a10))] p-5 mb-10">
               <div className="flex items-center justify-between mb-4">
-                <p className="text-xs text-white/50">
+                <p className="text-xs text-[rgb(var(--adm-fg)/var(--adm-a50))]">
                   {subscribers.length} {subscribers.length === 1 ? "subscriber" : "subscribers"}
                 </p>
                 {subscribers.length > 0 && (
                   <button
                     onClick={handleCopyEmails}
-                    className="text-[9px] tracking-[0.25em] uppercase text-white/30 hover:text-white/70 transition-colors border border-white/15 hover:border-white/35 px-4 py-1.5"
+                    className="text-[9px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] hover:text-[rgb(var(--adm-fg)/var(--adm-a70))] transition-colors border border-[rgb(var(--adm-fg)/var(--adm-a15))] hover:border-[rgb(var(--adm-fg)/var(--adm-a35))] px-4 py-1.5"
                   >
                     {copiedEmails ? "Copied ✓" : "Copy All Emails"}
                   </button>
                 )}
               </div>
               {subscribers.length === 0 ? (
-                <p className="text-[10px] text-white/20">No sign-ups yet — the footer form on every page feeds this list.</p>
+                <p className="text-[10px] text-[rgb(var(--adm-fg)/var(--adm-a20))]">No sign-ups yet — the footer form on every page feeds this list.</p>
               ) : (
                 <div className="space-y-1.5 max-h-64 overflow-y-auto">
                   {subscribers.map((s) => (
                     <div key={s.id} className="flex items-center gap-4 text-xs">
-                      <span className="text-white/70 flex-1 min-w-0 truncate">{s.email}</span>
-                      <span className="text-[9px] tracking-wider uppercase text-white/25 hidden sm:inline">{s.source}</span>
-                      <span className="text-white/25 whitespace-nowrap hidden md:inline">{formatOrderDate(s.created_at)}</span>
+                      <span className="text-[rgb(var(--adm-fg)/var(--adm-a70))] flex-1 min-w-0 truncate">{s.email}</span>
+                      <span className="text-[9px] tracking-wider uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] hidden sm:inline">{s.source}</span>
+                      <span className="text-[rgb(var(--adm-fg)/var(--adm-a25))] whitespace-nowrap hidden md:inline">{formatOrderDate(s.created_at)}</span>
                       <button
                         onClick={() => handleRemoveSubscriber(s.id)}
                         disabled={subscriberClearing === s.id}
                         title="Remove from list"
-                        className="text-white/20 hover:text-red-400/70 transition-colors disabled:opacity-30 leading-none"
+                        className="text-[rgb(var(--adm-fg)/var(--adm-a20))] hover:text-[rgb(var(--adm-red)/var(--adm-a70))] transition-colors disabled:opacity-30 leading-none"
                       >
                         ×
                       </button>
@@ -1797,26 +2443,26 @@ export default function AdminPage() {
               )}
             </div>
 
-            <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-2">Hero Banners</p>
-            <p className="text-[9px] text-white/20 mb-8">Upload new images to replace the hero banner on each page. Changes go live immediately.</p>
+            <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] mb-2">Hero Banners</p>
+            <p className="text-[9px] text-[rgb(var(--adm-fg)/var(--adm-a20))] mb-8">Upload new images to replace the hero banner on each page. Changes go live immediately.</p>
 
-            {heroError && <p className="text-red-400/80 text-[10px] tracking-wider mb-5">{heroError}</p>}
+            {heroError && <p className="text-[rgb(var(--adm-red)/var(--adm-a80))] text-[10px] tracking-wider mb-5">{heroError}</p>}
 
             {heroLoading ? (
-              <div className="border border-white/[0.08] py-24 text-center text-[9px] tracking-[0.3em] uppercase text-white/20">Loading...</div>
+              <div className="border border-[rgb(var(--adm-fg)/var(--adm-a08))] py-24 text-center text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a20))]">Loading...</div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {(["home", "women", "men", "accessories"] as const).map((page) => {
                   const imgs = heroImages[page] ?? { desktop_src: "", mobile_src: "" };
                   const labels: Record<string, string> = { home: "Home", women: "Women", men: "Men", accessories: "Accessories" };
                   return (
-                    <div key={page} className="border border-white/10 p-5 space-y-4">
+                    <div key={page} className="border border-[rgb(var(--adm-fg)/var(--adm-a10))] p-5 space-y-4">
                       <div className="flex items-center justify-between">
                         <p className="text-[9px] tracking-[0.35em] uppercase font-bold">{labels[page]}</p>
                         <button
                           onClick={() => handleSaveHero(page)}
                           disabled={heroSaving === page}
-                          className="bg-white text-black text-[8px] tracking-[0.3em] uppercase px-4 py-1.5 font-bold hover:bg-white/90 transition-colors disabled:opacity-40"
+                          className="bg-[rgb(var(--adm-fg))] text-[var(--adm-bg)] text-[8px] tracking-[0.3em] uppercase px-4 py-1.5 font-bold hover:bg-[rgb(var(--adm-fg)/var(--adm-a90))] transition-colors disabled:opacity-40"
                         >
                           {heroSaving === page ? "Saving..." : "Save"}
                         </button>
@@ -1849,10 +2495,10 @@ export default function AdminPage() {
           className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50"
           onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
         >
-          <div className="bg-[#111] border border-white/10 w-full max-w-lg max-h-[90vh] overflow-y-auto scrollbar-none">
-            <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.08]">
+          <div className="bg-[var(--adm-bg2)] border border-[rgb(var(--adm-fg)/var(--adm-a10))] w-full max-w-lg max-h-[90vh] overflow-y-auto scrollbar-none">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-[rgb(var(--adm-fg)/var(--adm-a08))]">
               <p className="text-[9px] tracking-[0.35em] uppercase font-bold">{editId ? "Edit Product" : "New Product"}</p>
-              <button onClick={closeModal} className="text-white/30 hover:text-white transition-colors text-2xl leading-none -mr-1">×</button>
+              <button onClick={closeModal} className="text-[rgb(var(--adm-fg)/var(--adm-a30))] hover:text-[rgb(var(--adm-fg))] transition-colors text-2xl leading-none -mr-1">×</button>
             </div>
 
             <form onSubmit={handleSave} className="px-6 py-6 space-y-5">
@@ -1877,8 +2523,11 @@ export default function AdminPage() {
                 </Field>
               </div>
 
-              {/* Stock + Badge */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Buying Price + Stock + Badge */}
+              <div className="grid grid-cols-3 gap-3">
+                <Field label="Buying Price (TZS)">
+                  <input type="number" min={0} value={form.costPrice} onChange={(e) => setForm({ ...form, costPrice: e.target.value })} placeholder="Cost per unit" className={inputCls} />
+                </Field>
                 <Field label="Units in Stock" required>
                   <input type="number" min={0} value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} placeholder="0" required className={inputCls} />
                 </Field>
@@ -1890,6 +2539,25 @@ export default function AdminPage() {
                   </select>
                 </Field>
               </div>
+
+              {/* Live margin readout — flags selling at a loss before saving */}
+              {(() => {
+                const cost = form.costPrice.trim() === "" ? null : Number(form.costPrice);
+                const sell = form.salePrice.trim() !== "" ? Number(form.salePrice) : Number(form.price);
+                if (cost == null || !Number.isFinite(cost) || !Number.isFinite(sell) || sell <= 0) return null;
+                const margin = sell - cost;
+                const pct = Math.round((margin / sell) * 100);
+                return margin < 0 ? (
+                  <p className="text-[10px] tracking-wider text-[rgb(var(--adm-red)/var(--adm-a90))] -mt-2">
+                    ⚠ Selling below cost: you lose TZS {Math.abs(margin).toLocaleString("en-TZ")} per unit at the current {form.salePrice.trim() !== "" ? "sale" : ""} price.
+                  </p>
+                ) : (
+                  <p className="text-[10px] tracking-wider text-[rgb(var(--adm-fg)/var(--adm-a30))] -mt-2">
+                    Margin: TZS {margin.toLocaleString("en-TZ")} per unit ({pct}%)
+                    {form.salePrice.trim() !== "" ? " at the sale price" : ""}
+                  </p>
+                );
+              })()}
 
               {/* Sizes */}
               <Field label="Sizes" required>
@@ -1907,7 +2575,7 @@ export default function AdminPage() {
                       key={label}
                       type="button"
                       onClick={() => setForm({ ...form, sizes: value })}
-                      className="text-[8px] tracking-[0.2em] uppercase border border-white/15 text-white/30 hover:border-white/35 hover:text-white/60 px-2 py-1 transition-colors"
+                      className="text-[8px] tracking-[0.2em] uppercase border border-[rgb(var(--adm-fg)/var(--adm-a15))] text-[rgb(var(--adm-fg)/var(--adm-a30))] hover:border-[rgb(var(--adm-fg)/var(--adm-a35))] hover:text-[rgb(var(--adm-fg)/var(--adm-a60))] px-2 py-1 transition-colors"
                     >
                       {label}
                     </button>
@@ -1918,24 +2586,24 @@ export default function AdminPage() {
               {/* Status */}
               <Field label="Status">
                 <label className="flex items-center gap-2.5 cursor-pointer">
-                  <input type="checkbox" checked={form.isComingSoon} onChange={(e) => setForm({ ...form, isComingSoon: e.target.checked })} className="w-3.5 h-3.5 accent-white" />
-                  <span className="text-xs text-white/60">Coming Soon</span>
+                  <input type="checkbox" checked={form.isComingSoon} onChange={(e) => setForm({ ...form, isComingSoon: e.target.checked })} className="w-3.5 h-3.5 accent-[rgb(var(--adm-fg))]" />
+                  <span className="text-xs text-[rgb(var(--adm-fg)/var(--adm-a60))]">Coming Soon</span>
                 </label>
               </Field>
 
               {/* Pre-orders — only meaningful for Coming Soon products */}
               {form.isComingSoon && (
-                <div className="border border-white/10 p-4 space-y-3">
+                <div className="border border-[rgb(var(--adm-fg)/var(--adm-a10))] p-4 space-y-3">
                   <label className="flex items-center gap-2.5 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={form.preorder}
                       onChange={(e) => setForm({ ...form, preorder: e.target.checked })}
-                      className="w-3.5 h-3.5 accent-white"
+                      className="w-3.5 h-3.5 accent-[rgb(var(--adm-fg))]"
                     />
                     <span>
-                      <span className="text-xs text-white/60 block">Accept Pre-Orders</span>
-                      <span className="text-[9px] text-white/25 block mt-0.5">Customers can buy now and receive it at release — stock limits don&apos;t apply</span>
+                      <span className="text-xs text-[rgb(var(--adm-fg)/var(--adm-a60))] block">Accept Pre-Orders</span>
+                      <span className="text-[9px] text-[rgb(var(--adm-fg)/var(--adm-a25))] block mt-0.5">Customers can buy now and receive it at release — stock limits don&apos;t apply</span>
                     </span>
                   </label>
                   {form.preorder && (
@@ -1965,7 +2633,7 @@ export default function AdminPage() {
                 adminKey={adminKey}
                 enabled={form.hasColors}
                 colors={form.colors}
-                onToggle={(on) => setForm({ ...form, hasColors: on, colors: on && form.colors.length === 0 ? [{ name: "", hex: "#000000", image: "" }] : form.colors })}
+                onToggle={(on) => setForm({ ...form, hasColors: on, colors: on && form.colors.length === 0 ? [{ name: "", hex: "#000000", image: "", images: [] }] : form.colors })}
                 onChange={(colors) => setForm({ ...form, colors })}
               />
 
@@ -2007,22 +2675,22 @@ export default function AdminPage() {
               </div>
 
               {/* Style It With */}
-              <div className="border border-white/10 p-4">
-                <p className="text-[9px] tracking-[0.25em] uppercase text-white/40 font-bold mb-1">Style It With</p>
-                <p className="text-[9px] text-white/20 mb-3">Curated pairings shown on the product page — outfits sell together.</p>
+              <div className="border border-[rgb(var(--adm-fg)/var(--adm-a10))] p-4">
+                <p className="text-[9px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a40))] font-bold mb-1">Style It With</p>
+                <p className="text-[9px] text-[rgb(var(--adm-fg)/var(--adm-a20))] mb-3">Curated pairings shown on the product page — outfits sell together.</p>
 
                 {form.styledWith.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {form.styledWith.map((sid) => {
                       const sp = products.find((p) => p.id === sid);
                       return (
-                        <span key={sid} className="inline-flex items-center gap-1.5 border border-white/20 px-2 py-1 text-[10px] text-white/60">
+                        <span key={sid} className="inline-flex items-center gap-1.5 border border-[rgb(var(--adm-fg)/var(--adm-a20))] px-2 py-1 text-[10px] text-[rgb(var(--adm-fg)/var(--adm-a60))]">
                           {sp?.name ?? sid}
                           <button
                             type="button"
                             onClick={() => setForm({ ...form, styledWith: form.styledWith.filter((x) => x !== sid) })}
                             aria-label={`Remove ${sp?.name ?? sid}`}
-                            className="text-white/30 hover:text-red-400/70 transition-colors leading-none"
+                            className="text-[rgb(var(--adm-fg)/var(--adm-a30))] hover:text-[rgb(var(--adm-red)/var(--adm-a70))] transition-colors leading-none"
                           >
                             ×
                           </button>
@@ -2049,13 +2717,13 @@ export default function AdminPage() {
                 </select>
               </div>
 
-              {actionError && <p className="text-red-400/80 text-[10px] tracking-wider">{actionError}</p>}
+              {actionError && <p className="text-[rgb(var(--adm-red)/var(--adm-a80))] text-[10px] tracking-wider">{actionError}</p>}
 
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={closeModal} className="flex-1 border border-white/20 text-white/50 text-[9px] tracking-[0.25em] uppercase py-3 hover:border-white/40 hover:text-white/70 transition-colors">
+                <button type="button" onClick={closeModal} className="flex-1 border border-[rgb(var(--adm-fg)/var(--adm-a20))] text-[rgb(var(--adm-fg)/var(--adm-a50))] text-[9px] tracking-[0.25em] uppercase py-3 hover:border-[rgb(var(--adm-fg)/var(--adm-a40))] hover:text-[rgb(var(--adm-fg)/var(--adm-a70))] transition-colors">
                   CANCEL
                 </button>
-                <button type="submit" disabled={saving} className="flex-1 bg-white text-black text-[9px] tracking-[0.25em] uppercase py-3 font-bold hover:bg-white/90 transition-colors disabled:opacity-40">
+                <button type="submit" disabled={saving} className="flex-1 bg-[rgb(var(--adm-fg))] text-[var(--adm-bg)] text-[9px] tracking-[0.25em] uppercase py-3 font-bold hover:bg-[rgb(var(--adm-fg)/var(--adm-a90))] transition-colors disabled:opacity-40">
                   {saving ? "SAVING..." : editId ? "SAVE CHANGES" : "ADD PRODUCT"}
                 </button>
               </div>
