@@ -3,6 +3,7 @@
 import { Fragment, useState, useEffect, useCallback, useRef } from "react";
 import { effectivePrice, type PDPProduct } from "@/lib/products";
 import type { SavedOrder } from "@/lib/orders";
+import { waPhone, followupWaUrl, pendingNudgeWaUrl, type FollowupKind } from "@/lib/followups";
 import { promoLabel, type PromoCode } from "@/lib/promo";
 import { SITE_URL } from "@/lib/site";
 
@@ -119,12 +120,6 @@ function urlBase64ToUint8Array(base64: string): Uint8Array {
   return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
 }
 
-/** Normalise stored digits to international format for wa.me links. */
-function waPhone(digits: string): string {
-  if (digits.startsWith("0")) return "255" + digits.slice(1);
-  if (digits.length === 9) return "255" + digits;
-  return digits;
-}
 
 /** One-tap customer status update: prefilled WhatsApp message for the order's
  *  current status, or null when there's nothing worth sending (cancelled). */
@@ -649,7 +644,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
 
   // UI
-  const [activeTab, setActiveTab] = useState<"overview" | "orders" | "inventory" | "reviews" | "promos" | "hero">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "orders" | "followups" | "inventory" | "reviews" | "promos" | "hero">("overview");
   const [showModal, setShowModal] = useState(false);
 
   // Inventory filters
@@ -670,6 +665,7 @@ export default function AdminPage() {
   const [statusSaving, setStatusSaving] = useState<string | null>(null);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [resettingOrders, setResettingOrders] = useState(false);
+  const [followupSaving, setFollowupSaving] = useState<string | null>(null);
 
   // Restock waitlist
   const [restockRequests, setRestockRequests] = useState<RestockRequest[]>([]);
@@ -710,6 +706,13 @@ export default function AdminPage() {
   const [announcementSaving, setAnnouncementSaving] = useState(false);
   const [announcementSaved, setAnnouncementSaved] = useState(false);
   const [announcementError, setAnnouncementError] = useState("");
+
+  // Delivery pricing
+  const [deliveryFeeInput, setDeliveryFeeInput] = useState("");
+  const [deliveryThresholdInput, setDeliveryThresholdInput] = useState("");
+  const [deliverySaving, setDeliverySaving] = useState(false);
+  const [deliverySaved, setDeliverySaved] = useState(false);
+  const [deliveryError, setDeliveryError] = useState("");
 
   // Hero images
   const [heroImages, setHeroImages] = useState<Record<string, { desktop_src: string; mobile_src: string }>>({});
@@ -782,6 +785,8 @@ export default function AdminPage() {
         const json = await res.json();
         setAnnouncement(json.announcement ?? "");
         setWelcomePromo(json.welcome_promo ?? "");
+        setDeliveryFeeInput(json.delivery_fee ?? "5000");
+        setDeliveryThresholdInput(json.free_delivery_threshold ?? "150000");
       }
     } catch { /* silent — editor starts blank */ }
   }, []);
@@ -840,6 +845,58 @@ export default function AdminPage() {
     fetchSubscribers(adminKey);
     fetchPromos(adminKey);
   }, [adminKey, fetchProducts, fetchHeroImages, fetchOrders, fetchRestock, fetchReviews, fetchSettings, fetchSubscribers, fetchPromos]);
+
+  const handleSaveDelivery = async () => {
+    if (!adminKey || deliverySaving) return;
+    setDeliverySaving(true);
+    setDeliveryError("");
+    setDeliverySaved(false);
+    try {
+      for (const [key, value] of [
+        ["delivery_fee", deliveryFeeInput.trim()],
+        ["free_delivery_threshold", deliveryThresholdInput.trim()],
+      ] as const) {
+        const res = await fetch("/api/admin/settings", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+          body: JSON.stringify({ key, value }),
+        });
+        if (!res.ok) {
+          const json = await res.json().catch(() => null);
+          throw new Error(json?.error ?? "Failed to save.");
+        }
+      }
+      setDeliverySaved(true);
+      setTimeout(() => setDeliverySaved(false), 2500);
+    } catch (err) {
+      setDeliveryError(err instanceof Error ? err.message : "Failed to save.");
+    } finally {
+      setDeliverySaving(false);
+    }
+  };
+
+  /** Mark a Day-2/14/45 touchpoint as sent — removes it from the queue for good. */
+  const handleFollowupDone = async (orderId: string, kind: FollowupKind) => {
+    if (!adminKey) return;
+    setFollowupSaving(`${orderId}:${kind}`);
+    try {
+      const res = await fetch("/api/admin/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify({ id: orderId, followup: kind }),
+      });
+      if (!res.ok) throw new Error();
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === orderId ? { ...o, followups_done: { ...(o.followups_done ?? {}), [kind]: true } } : o
+        )
+      );
+    } catch {
+      setOrdersError("Failed to mark the follow-up as done. Try again.");
+    } finally {
+      setFollowupSaving(null);
+    }
+  };
 
   /** Testing-phase reset: wipes every order, releases held stock, zeroes
    *  promo redemption counts. Guarded by a typed confirmation. */
@@ -1434,6 +1491,35 @@ export default function AdminPage() {
   }
   const missingCostProducts = products.filter((p) => p.costPrice == null).length;
 
+  /* ── Follow-up queue (Day-2 review ask · Day-14 styling tip · Day-45 win-back) ── */
+  const daysSince = (iso: string) => (now.getTime() - new Date(iso).getTime()) / 86_400_000;
+  const deliveredOrdersList = orders.filter(
+    (o) => o.status === "delivered" && o.status_history?.delivered
+  );
+  const day2Queue = deliveredOrdersList.filter((o) => {
+    const d = daysSince(o.status_history!.delivered!);
+    return d >= 2 && d <= 6 && !o.followups_done?.day2;
+  });
+  const day14Queue = deliveredOrdersList.filter((o) => {
+    const d = daysSince(o.status_history!.delivered!);
+    return d >= 13 && d <= 20 && !o.followups_done?.day14;
+  });
+  const day45Queue = deliveredOrdersList.filter((o) => {
+    if (daysSince(o.status_history!.delivered!) < 42 || o.followups_done?.day45) return false;
+    /* Never win-back someone who already came back on their own */
+    const phone = waPhone(o.phone);
+    return !orders.some(
+      (x) =>
+        x.id !== o.id &&
+        waPhone(x.phone) === phone &&
+        new Date(x.created_at) > new Date(o.created_at)
+    );
+  });
+  const stalePending = orders
+    .filter((o) => o.status === "pending" && daysSince(o.created_at) >= 1)
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const followupsDue = day2Queue.length + day14Queue.length + day45Queue.length + stalePending.length;
+
   /* Promo performance — cancelled orders excluded so abandoned promos don't inflate the numbers */
   const promoOrders = orders.filter((o) => o.promo_code && (o.discount ?? 0) > 0 && o.status !== "cancelled");
   const discountGiven = promoOrders.reduce((sum, o) => sum + (o.discount ?? 0), 0);
@@ -1516,7 +1602,7 @@ export default function AdminPage() {
 
       <main className="px-6 md:px-10 py-8 max-w-7xl mx-auto">
         <nav className="flex gap-8 border-b border-[rgb(var(--adm-fg)/var(--adm-a08))] mb-10">
-          {(["overview", "orders", "inventory", "reviews", "promos", "hero"] as const).map((tab) => (
+          {(["overview", "orders", "followups", "inventory", "reviews", "promos", "hero"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -1524,7 +1610,10 @@ export default function AdminPage() {
                 activeTab === tab ? "text-[rgb(var(--adm-fg))] border-b border-[rgb(var(--adm-fg))] -mb-px" : "text-[rgb(var(--adm-fg)/var(--adm-a25))] hover:text-[rgb(var(--adm-fg)/var(--adm-a50))]"
               }`}
             >
-              {tab === "hero" ? "Site & Banners" : tab}
+              {tab === "hero" ? "Site & Banners" : tab === "followups" ? "Follow-ups" : tab}
+              {tab === "followups" && followupsDue > 0 && (
+                <span className="ml-1.5 text-[8px] text-[rgb(var(--adm-amber)/var(--adm-a80))] tabular-nums">{followupsDue}</span>
+              )}
               {tab === "orders" && pendingOrders > 0 && (
                 <span className="ml-1.5 text-[8px] text-[rgb(var(--adm-amber)/var(--adm-a80))] tabular-nums">{pendingOrders}</span>
               )}
@@ -1802,6 +1891,114 @@ export default function AdminPage() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* ── Follow-ups ────────────────────────────────────────────────────── */}
+        {activeTab === "followups" && (
+          <section>
+            {ordersError && <p className="text-[rgb(var(--adm-red)/var(--adm-a80))] text-[10px] tracking-wider mb-4">{ordersError}</p>}
+
+            {followupsDue === 0 && (
+              <div className="border border-[rgb(var(--adm-fg)/var(--adm-a08))] py-24 text-center text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a20))]">
+                All caught up — nothing due today
+              </div>
+            )}
+
+            {([
+              {
+                kind: "day2" as const,
+                title: "Day 2 — Review & photo ask",
+                hint: "Delivered 2–6 days ago. Ask how it fits, invite a review and a photo.",
+                queue: day2Queue,
+              },
+              {
+                kind: "day14" as const,
+                title: "Day 14 — Styling tip",
+                hint: "Delivered about two weeks ago. Share a styling idea, point at new looks.",
+                queue: day14Queue,
+              },
+              {
+                kind: "day45" as const,
+                title: "Day 45 — Win-back",
+                hint: "No repeat order in 6+ weeks. Offer early access to the next drop.",
+                queue: day45Queue,
+              },
+            ]).map(({ kind, title, hint, queue }) =>
+              queue.length === 0 ? null : (
+                <div key={kind} className="mb-10">
+                  <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] mb-1">
+                    {title} · {queue.length}
+                  </p>
+                  <p className="text-[9px] text-[rgb(var(--adm-fg)/var(--adm-a20))] mb-4">{hint}</p>
+                  <div className="border border-[rgb(var(--adm-fg)/var(--adm-a08))] divide-y divide-[rgb(var(--adm-fg)/var(--adm-a04))]">
+                    {queue.map((o) => (
+                      <div key={o.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-xs">
+                        <span className="font-mono text-[rgb(var(--adm-fg))]">{o.id}</span>
+                        <span className="text-[rgb(var(--adm-fg)/var(--adm-a70))]">{o.customer_name}</span>
+                        <span className="text-[rgb(var(--adm-fg)/var(--adm-a40))]">{o.phone}</span>
+                        <span className="text-[rgb(var(--adm-fg)/var(--adm-a40))] flex-1 min-w-0 truncate">
+                          {o.items?.[0]?.name}
+                          {(o.items?.length ?? 0) > 1 ? ` +${o.items.length - 1} more` : ""}
+                        </span>
+                        <span className="text-[rgb(var(--adm-fg)/var(--adm-a30))] tabular-nums whitespace-nowrap">
+                          {Math.floor(daysSince(o.status_history!.delivered!))}d since delivery
+                        </span>
+                        <a
+                          href={followupWaUrl(o, kind)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[rgb(var(--adm-emerald)/var(--adm-a70))] hover:text-[rgb(var(--adm-emerald))] transition-colors whitespace-nowrap"
+                        >
+                          Message ↗
+                        </a>
+                        <button
+                          onClick={() => handleFollowupDone(o.id, kind)}
+                          disabled={followupSaving === `${o.id}:${kind}`}
+                          className="text-[9px] tracking-[0.2em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] hover:text-[rgb(var(--adm-fg)/var(--adm-a70))] transition-colors disabled:opacity-40"
+                        >
+                          {followupSaving === `${o.id}:${kind}` ? "..." : "Done"}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            )}
+
+            {stalePending.length > 0 && (
+              <div className="mb-10">
+                <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-amber)/var(--adm-a70))] mb-1">
+                  Stale pending · {stalePending.length}
+                </p>
+                <p className="text-[9px] text-[rgb(var(--adm-fg)/var(--adm-a20))] mb-4">
+                  Ordered over 24h ago, payment never confirmed. Nudge them — oldest first. Rows clear when the order is confirmed or cancelled.
+                </p>
+                <div className="border border-[rgb(var(--adm-amber)/var(--adm-a20))] divide-y divide-[rgb(var(--adm-fg)/var(--adm-a04))]">
+                  {stalePending.map((o) => (
+                    <div key={o.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-xs">
+                      <span className="font-mono text-[rgb(var(--adm-fg))]">{o.id}</span>
+                      <span className="text-[rgb(var(--adm-fg)/var(--adm-a70))]">{o.customer_name}</span>
+                      <span className="text-[rgb(var(--adm-fg)/var(--adm-a40))]">{o.phone}</span>
+                      <span className="text-[rgb(var(--adm-fg)/var(--adm-a40))] flex-1 min-w-0 truncate tabular-nums">
+                        TZS {o.total.toLocaleString("en-TZ")}
+                      </span>
+                      <span className="text-[rgb(var(--adm-fg)/var(--adm-a30))] tabular-nums whitespace-nowrap">
+                        {Math.floor(daysSince(o.created_at))}d pending
+                      </span>
+                      <a
+                        href={pendingNudgeWaUrl(o)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[rgb(var(--adm-emerald)/var(--adm-a70))] hover:text-[rgb(var(--adm-emerald))] transition-colors whitespace-nowrap"
+                      >
+                        Message ↗
+                      </a>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </section>
@@ -2379,6 +2576,41 @@ export default function AdminPage() {
               {pushState === "error" && pushError && (
                 <p className="text-[rgb(var(--adm-red)/var(--adm-a80))] text-[10px] tracking-wider w-full">{pushError}</p>
               )}
+            </div>
+
+            <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] mb-2">Delivery Pricing</p>
+            <p className="text-[9px] text-[rgb(var(--adm-fg)/var(--adm-a20))] mb-4">Live on the cart and checkout within a few minutes of saving — no redeploy. The free-delivery progress bar uses the threshold.</p>
+            <div className="border border-[rgb(var(--adm-fg)/var(--adm-a10))] p-5 mb-10">
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+                <div className="flex-1">
+                  <label className="block text-[8px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] mb-1.5">Delivery Fee (TZS)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={deliveryFeeInput}
+                    onChange={(e) => setDeliveryFeeInput(e.target.value)}
+                    className="w-full bg-transparent border border-[rgb(var(--adm-fg)/var(--adm-a20))] text-[rgb(var(--adm-fg))] px-3 py-2.5 text-sm focus:outline-none focus:border-[rgb(var(--adm-fg)/var(--adm-a60))] transition-colors"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-[8px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] mb-1.5">Free Delivery Above (TZS)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={deliveryThresholdInput}
+                    onChange={(e) => setDeliveryThresholdInput(e.target.value)}
+                    className="w-full bg-transparent border border-[rgb(var(--adm-fg)/var(--adm-a20))] text-[rgb(var(--adm-fg))] px-3 py-2.5 text-sm focus:outline-none focus:border-[rgb(var(--adm-fg)/var(--adm-a60))] transition-colors"
+                  />
+                </div>
+                <button
+                  onClick={handleSaveDelivery}
+                  disabled={deliverySaving}
+                  className="bg-[rgb(var(--adm-fg))] text-[var(--adm-bg)] text-[9px] tracking-[0.3em] uppercase px-6 py-2.5 font-bold hover:bg-[rgb(var(--adm-fg)/var(--adm-a90))] transition-colors disabled:opacity-40 shrink-0"
+                >
+                  {deliverySaving ? "Saving..." : deliverySaved ? "Saved ✓" : "Save"}
+                </button>
+              </div>
+              {deliveryError && <p className="text-[rgb(var(--adm-red)/var(--adm-a80))] text-[10px] tracking-wider mt-2">{deliveryError}</p>}
             </div>
 
             <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] mb-2">Announcement Bar</p>
