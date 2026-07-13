@@ -23,11 +23,18 @@ export interface OrderItem extends CartItem {
   cost?: number | null;
 }
 
+export type CancelReason = "refused_delivery" | "unreachable" | "changed_mind" | "other";
+
 export interface SavedOrder extends OrderPayload {
   id: string;
   status: "pending" | "confirmed" | "dispatched" | "delivered" | "cancelled";
   created_at: string;
   items: OrderItem[];
+  /** First time each status was reached — never overwritten on revert/re-confirm */
+  status_history?: Partial<Record<"confirmed" | "dispatched" | "delivered" | "cancelled", string>>;
+  /** WhatsApp retention touchpoints already sent (Follow-ups tab) */
+  followups_done?: Partial<Record<"day2" | "day14" | "day45", boolean>>;
+  cancel_reason?: CancelReason | null;
 }
 
 /** Generate a short human-readable order ID: LVL-XXXXXX */

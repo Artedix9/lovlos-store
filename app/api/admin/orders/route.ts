@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/adminAuth";
 import { revalidatePath } from "next/cache";
 import { getSupabase } from "@/lib/supabase";
-import type { SavedOrder } from "@/lib/orders";
+import type { CancelReason, SavedOrder } from "@/lib/orders";
 
 const VALID_STATUSES = ["pending", "confirmed", "dispatched", "delivered", "cancelled"] as const;
+const CANCEL_REASONS: readonly CancelReason[] = ["refused_delivery", "unreachable", "changed_mind", "other"];
+const FOLLOWUP_KINDS = ["day2", "day14", "day45"] as const;
 
 /* Stock is held once payment is confirmed — pending orders never touch
    inventory, so an unpaid order can't block other customers. */
@@ -82,16 +84,57 @@ export async function DELETE(req: NextRequest) {
   });
 }
 
+/** PATCH { id, followup } — mark a retention touchpoint as sent.
+ *  Deliberately free of stock/promo side effects. */
+export async function PATCH(req: NextRequest) {
+  const denied = requireAdmin(req);
+  if (denied) return denied;
+
+  const body = await req.json();
+  const { id, followup } = body as { id?: string; followup?: string };
+
+  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  if (!followup || !FOLLOWUP_KINDS.includes(followup as (typeof FOLLOWUP_KINDS)[number])) {
+    return NextResponse.json({ error: "Invalid followup kind" }, { status: 400 });
+  }
+
+  const supabase = getSupabase();
+  const { data: existing, error: fetchError } = await supabase
+    .from("orders")
+    .select("followups_done")
+    .eq("id", id)
+    .maybeSingle();
+  if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
+  if (!existing) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+
+  const done = { ...(existing.followups_done ?? {}), [followup]: true };
+  const { data, error } = await supabase
+    .from("orders")
+    .update({ followups_done: done })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data);
+}
+
 export async function PUT(req: NextRequest) {
   const denied = requireAdmin(req);
   if (denied) return denied;
 
   const body = await req.json();
-  const { id, status } = body as { id?: string; status?: string };
+  const { id, status, cancel_reason } = body as {
+    id?: string;
+    status?: string;
+    cancel_reason?: string;
+  };
 
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   if (!status || !VALID_STATUSES.includes(status as (typeof VALID_STATUSES)[number])) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+  }
+  if (cancel_reason !== undefined && !CANCEL_REASONS.includes(cancel_reason as CancelReason)) {
+    return NextResponse.json({ error: "Invalid cancel reason" }, { status: 400 });
   }
 
   const supabase = getSupabase();
@@ -109,9 +152,18 @@ export async function PUT(req: NextRequest) {
   const order = existing as SavedOrder;
   if (order.status === status) return NextResponse.json(existing);
 
+  /* First time each status is reached — reverts and re-confirms never
+     overwrite, so "delivered" always means the original delivery date. */
+  const history = { ...(order.status_history ?? {}) } as Record<string, string>;
+  if (status !== "pending" && !history[status]) history[status] = new Date().toISOString();
+
   const { data, error } = await supabase
     .from("orders")
-    .update({ status })
+    .update({
+      status,
+      status_history: history,
+      ...(status === "cancelled" ? { cancel_reason: cancel_reason ?? null } : {}),
+    })
     .eq("id", id)
     .select()
     .single();
