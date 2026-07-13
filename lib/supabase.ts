@@ -43,6 +43,7 @@ export function fromRow(row: any): PDPProduct {
     fitNotes: row.fit_notes ?? "",
     styledWith: row.styled_with ?? [],
     preorder: row.preorder ?? false,
+    publishAt: row.publish_at ?? null, /* access_code stays admin-only — never map it here */
     releaseNote: row.release_note ?? "",
   };
 }

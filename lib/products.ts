@@ -15,6 +15,8 @@ export interface PDPProduct {
   price: number;         // TZS
   salePrice?: number;    // TZS — when set, shown against a struck-through price
   costPrice?: number;    // TZS buying price — populated ONLY by the admin API, never public routes
+  publishAt?: string | null;  // future = early-access gated (public sees Coming Soon)
+  accessCode?: string | null; // unlock code — populated ONLY by the admin API, never public routes
   badge?: string;
   images: string[];      // ordered: hero first
   colors?: ProductColor[];
@@ -34,6 +36,12 @@ export interface PDPProduct {
 /** Coming Soon products with pre-orders enabled are buyable ahead of release. */
 export function isPreorderable(p: { isComingSoon?: boolean; preorder?: boolean }): boolean {
   return !!p.isComingSoon && !!p.preorder;
+}
+
+/** Early-access gate: publish_at in the future means the public sees Coming
+ *  Soon; visitors holding the product's access code can buy early. */
+export function isUnpublished(p: { publishAt?: string | null }, now: number = Date.now()): boolean {
+  return !!p.publishAt && new Date(p.publishAt).getTime() > now;
 }
 
 export const PRODUCTS: PDPProduct[] = productsData as PDPProduct[];

@@ -232,7 +232,8 @@ export default function CheckoutPage() {
       subtotal,
       delivery_fee: deliveryFee,
       total,
-      promo_code: discount > 0 && appliedPromo ? appliedPromo.code : null,
+      /* The code travels even at 0 discount — it can be an early-access key */
+      promo_code: appliedPromo?.code ?? null,
       discount,
     };
 

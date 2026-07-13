@@ -6,7 +6,8 @@ import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { formatTZS, effectivePrice, type PDPProduct, type ProductColor } from "@/lib/products";
+import { formatTZS, effectivePrice, isUnpublished, type PDPProduct, type ProductColor } from "@/lib/products";
+import { getStoredPromo } from "@/lib/promoStorage";
 import type { Review } from "@/lib/reviews";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/context/ToastContext";
@@ -376,13 +377,34 @@ export default function ProductPageClient({
 
   const heroImage = selectedColor?.image ?? product.images[0] ?? "";
 
-  const preorderable = !!product.isComingSoon && !!product.preorder;
+  /* Early access: gated products render as Coming Soon, but a visitor whose
+     stored ?promo= code matches the product's access code (checked server-
+     side, the code never ships to the client) gets the full buyable page. */
+  const [earlyUnlocked, setEarlyUnlocked] = useState(false);
+  useEffect(() => {
+    if (!isUnpublished(product)) return;
+    const code = getStoredPromo();
+    if (!code) return;
+    fetch("/api/early-access", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: product.id, code }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.unlocked) setEarlyUnlocked(true);
+      })
+      .catch(() => {});
+  }, [product]);
+  const comingSoon = earlyUnlocked ? false : !!product.isComingSoon;
+
+  const preorderable = comingSoon && !!product.preorder;
   /* a "teaser" is coming-soon without pre-orders — visible but not buyable */
-  const teaser = !!product.isComingSoon && !preorderable;
+  const teaser = comingSoon && !preorderable;
 
   /* undefined stock (e.g. bundled fallback data) means "don't gate" */
-  const soldOut = !product.isComingSoon && product.stock !== undefined && product.stock <= 0;
-  const lowStock = !product.isComingSoon && product.stock !== undefined && product.stock > 0 && product.stock <= 5;
+  const soldOut = !comingSoon && product.stock !== undefined && product.stock <= 0;
+  const lowStock = !comingSoon && product.stock !== undefined && product.stock > 0 && product.stock <= 5;
 
   const price = effectivePrice(product);
   const onSale = price < product.price;
@@ -681,6 +703,11 @@ export default function ProductPageClient({
               {preorderable && (
                 <span className="inline-block border border-primary text-primary text-[10px] tracking-widest uppercase px-2.5 py-1 mb-4 font-bold ml-0.5">
                   Pre-Order
+                </span>
+              )}
+              {earlyUnlocked && (
+                <span className="inline-block bg-highlight-medium text-primary text-[10px] tracking-widest uppercase px-2.5 py-1 mb-4 font-bold ml-0.5">
+                  Early Access
                 </span>
               )}
 

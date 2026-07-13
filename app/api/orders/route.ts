@@ -65,12 +65,21 @@ export async function POST(req: NextRequest) {
       .select("*")
       .in("id", [...wanted.keys()]);
     if (stockError) throw stockError;
+    const orderPromo = normalizePromoCode(order.promo_code ?? "");
     for (const [productId, qty] of wanted) {
       const row = (stockRows ?? []).find((r) => r.id === productId);
       if (!row) {
         return NextResponse.json(
           { error: "An item in your bag is no longer available. Please remove it and try again." },
           { status: 409 }
+        );
+      }
+      /* Early-access gate — client hiding alone is not enough */
+      const gated = !!row.publish_at && new Date(row.publish_at).getTime() > Date.now();
+      if (gated && (!row.access_code || orderPromo !== String(row.access_code).toUpperCase())) {
+        return NextResponse.json(
+          { error: `"${row.name}" isn't available yet. Please remove it from your bag.` },
+          { status: 403 }
         );
       }
       /* Pre-order items (per the DB, not the client) have no stock to check */

@@ -22,10 +22,31 @@ function parseSalePrice(raw: unknown, regularPrice: number): number | null | und
   return Math.round(n);
 }
 
-/** Buying price — admin-only, so fromRow never carries it. Attach here. */
+/** Buying price + early-access code — admin-only, so fromRow never carries them. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function adminRow(row: any) {
-  return { ...fromRow(row), costPrice: row.cost_price ?? undefined };
+  return {
+    ...fromRow(row),
+    costPrice: row.cost_price ?? undefined,
+    accessCode: row.access_code ?? null,
+  };
+}
+
+/** Early-access inputs: publishAt ISO string (or empty = public),
+ *  accessCode promo code (or empty = plain coming-soon gate). */
+function parseEarlyAccess(body: Record<string, unknown>): { publish_at: string | null; access_code: string | null } | { error: string } {
+  const rawAt = body.publishAt;
+  const rawCode = body.accessCode;
+  let publish_at: string | null = null;
+  if (rawAt != null && rawAt !== "") {
+    const t = new Date(String(rawAt));
+    if (isNaN(t.getTime())) return { error: "Invalid publish date" };
+    publish_at = t.toISOString();
+  }
+  const access_code = rawCode != null && String(rawCode).trim() !== ""
+    ? String(rawCode).trim().toUpperCase()
+    : null;
+  return { publish_at, access_code };
 }
 
 /** null = not recorded; otherwise a non-negative amount. */
@@ -74,6 +95,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Buying price must be zero or a positive number" }, { status: 400 });
   }
 
+  const earlyAccess = parseEarlyAccess(body);
+  if ("error" in earlyAccess) {
+    return NextResponse.json({ error: earlyAccess.error }, { status: 400 });
+  }
+
   const db = getSupabase();
 
   const { data: maxData } = await db
@@ -91,6 +117,8 @@ export async function POST(req: NextRequest) {
     price: Number(body.price),
     sale_price: salePrice,
     cost_price: costPrice,
+    publish_at: earlyAccess.publish_at,
+    access_code: earlyAccess.access_code,
     badge: body.badge || null,
     images: body.images ?? [],
     colors: body.colors ?? [],
@@ -142,6 +170,12 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Buying price must be zero or a positive number" }, { status: 400 });
     }
     updates.cost_price = costPrice;
+  }
+  if ("publishAt" in body || "accessCode" in body) {
+    const ea = parseEarlyAccess(body);
+    if ("error" in ea) return NextResponse.json({ error: ea.error }, { status: 400 });
+    if ("publishAt" in body) updates.publish_at = ea.publish_at;
+    if ("accessCode" in body) updates.access_code = ea.access_code;
   }
   if ("badge" in body) updates.badge = body.badge || null;
   if (body.images !== undefined) updates.images = body.images;

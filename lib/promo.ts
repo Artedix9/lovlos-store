@@ -8,6 +8,7 @@ export interface PromoCode {
   min_subtotal: number;
   max_uses: number | null;
   use_count: number;
+  visit_count?: number; // campaign-link landings (?promo=CODE), once per session
   expires_at: string | null;
   active: boolean;
   created_at: string;
