@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
 import { deliveryFeeFor } from "@/lib/delivery";
+import { getDeliveryConfig } from "@/lib/settings";
 import { checkPromo, normalizePromoCode, type PromoCode } from "@/lib/promo";
 
 /**
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
     if (error) throw error;
 
     const promo = (data as PromoCode | null) ?? null;
-    const result = checkPromo(promo, subtotal, deliveryFeeFor(subtotal));
+    const result = checkPromo(promo, subtotal, deliveryFeeFor(subtotal, await getDeliveryConfig()));
     if (!result.ok) {
       return NextResponse.json({ error: result.reason }, { status: 400 });
     }

@@ -6,7 +6,8 @@ import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { useFocusTrap } from "@/lib/useFocusTrap";
 import { formatTZS } from "@/lib/products";
-import { FREE_DELIVERY_THRESHOLD, deliveryFeeFor } from "@/lib/delivery";
+import { deliveryFeeFor } from "@/lib/delivery";
+import { useDeliveryConfig } from "@/lib/useDeliveryConfig";
 
 const TRANSITION_MS = 300;
 
@@ -16,6 +17,7 @@ export default function CartDrawer() {
 
   const [mounted, setMounted] = useState(false);
   const panelRef = useFocusTrap<HTMLElement>(isOpen, closeCart);
+  const delivery = useDeliveryConfig();
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
@@ -200,7 +202,7 @@ export default function CartDrawer() {
           <div className="shrink-0 border-t border-white/[0.08] px-6 py-6 space-y-5 bg-primary">
             {/* Free-delivery progress */}
             <div aria-live="polite">
-              {subtotal >= FREE_DELIVERY_THRESHOLD ? (
+              {subtotal >= delivery.threshold ? (
                 <p className="text-[11px] font-bold tracking-widest uppercase text-white flex items-center gap-2">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -212,7 +214,7 @@ export default function CartDrawer() {
                 <p className="text-[11px] tracking-widest uppercase text-white/70">
                   Add{" "}
                   <span className="font-bold text-white">
-                    {formatTZS(FREE_DELIVERY_THRESHOLD - subtotal)}
+                    {formatTZS(delivery.threshold - subtotal)}
                   </span>{" "}
                   more for free delivery
                 </p>
@@ -220,7 +222,7 @@ export default function CartDrawer() {
               <div className="mt-2.5 h-1 bg-white/10 overflow-hidden" aria-hidden="true">
                 <div
                   className="h-full bg-white transition-[width] duration-500 ease-out"
-                  style={{ width: `${Math.min((subtotal / FREE_DELIVERY_THRESHOLD) * 100, 100)}%` }}
+                  style={{ width: `${Math.min((subtotal / delivery.threshold) * 100, 100)}%` }}
                 />
               </div>
             </div>
@@ -240,7 +242,7 @@ export default function CartDrawer() {
                   Delivery
                 </span>
                 <span className="text-xs text-white/70 tracking-wide">
-                  {deliveryFeeFor(subtotal) === 0 ? "Free" : formatTZS(deliveryFeeFor(subtotal))}
+                  {deliveryFeeFor(subtotal, delivery) === 0 ? "Free" : formatTZS(deliveryFeeFor(subtotal, delivery))}
                 </span>
               </div>
               <div className="flex items-baseline justify-between pt-2.5 border-t border-white/[0.08]">
@@ -248,7 +250,7 @@ export default function CartDrawer() {
                   Total
                 </span>
                 <span className="text-base font-bold text-white tracking-tight">
-                  {formatTZS(subtotal + deliveryFeeFor(subtotal))}
+                  {formatTZS(subtotal + deliveryFeeFor(subtotal, delivery))}
                 </span>
               </div>
             </div>

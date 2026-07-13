@@ -25,6 +25,14 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Missing key or value" }, { status: 400 });
   }
 
+  /* Delivery pricing keys must be non-negative whole TZS amounts */
+  if (["delivery_fee", "free_delivery_threshold"].includes(key)) {
+    const n = Number(value);
+    if (!Number.isInteger(n) || n < 0) {
+      return NextResponse.json({ error: "Enter a whole TZS amount (0 or more)." }, { status: 400 });
+    }
+  }
+
   const { error } = await getSupabase()
     .from("site_settings")
     .upsert({ key, value, updated_at: new Date().toISOString() });
@@ -33,5 +41,9 @@ export async function PUT(req: NextRequest) {
 
   // The announcement bar renders from the root layout on every page.
   revalidatePath("/", "layout");
+  // Cart/checkout read delivery pricing from this cached route.
+  if (["delivery_fee", "free_delivery_threshold"].includes(key)) {
+    revalidatePath("/api/delivery");
+  }
   return NextResponse.json({ success: true });
 }

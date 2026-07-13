@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { OrderPayload, SavedOrder } from "@/lib/orders";
 import { checkPromo, normalizePromoCode, type PromoCode } from "@/lib/promo";
 import { deliveryFeeFor } from "@/lib/delivery";
+import { getDeliveryConfig } from "@/lib/settings";
 
 /**
  * POST /api/orders
@@ -88,8 +89,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    /* Promo — re-validated here so the client-side discount is never trusted.
-       The total is recomputed from the subtotal + server-side discount. */
+    /* Delivery fee is recomputed from the live admin-configured pricing —
+       the client's figure is display-only. */
+    const deliveryConfig = await getDeliveryConfig();
+    order.delivery_fee = deliveryFeeFor(order.subtotal, deliveryConfig);
+
+    /* Promo — re-validated here so the client-side discount is never trusted. */
     let promoCode: string | null = null;
     let discount = 0;
     if (order.promo_code) {
@@ -103,7 +108,7 @@ export async function POST(req: NextRequest) {
       const result = checkPromo(
         (promoRow as PromoCode | null) ?? null,
         order.subtotal,
-        deliveryFeeFor(order.subtotal)
+        order.delivery_fee
       );
       if (!result.ok) {
         return NextResponse.json(
@@ -115,8 +120,10 @@ export async function POST(req: NextRequest) {
       discount = result.discount;
       order.promo_code = code;
       order.discount = discount;
-      order.total = order.subtotal - discount + order.delivery_fee;
     }
+
+    /* Total always derives from server-side figures */
+    order.total = order.subtotal - discount + order.delivery_fee;
 
     /* Snapshot each item's buying cost for profit reporting. Stored only —
        the response below returns the client's items, so cost never reaches

@@ -11,6 +11,7 @@ import { formatTZS } from "@/lib/products";
 import { buildWhatsAppUrl, generateOrderId } from "@/lib/orders";
 import type { OrderPayload, SavedOrder } from "@/lib/orders";
 import { deliveryFeeFor } from "@/lib/delivery";
+import { useDeliveryConfig } from "@/lib/useDeliveryConfig";
 import { recordOrder, getCheckoutProfile, saveCheckoutProfile } from "@/lib/orderHistory";
 import { promoDiscountFor, promoLabel, type PromoCode } from "@/lib/promo";
 import { getStoredPromo, clearStoredPromo } from "@/lib/promoStorage";
@@ -117,7 +118,8 @@ export default function CheckoutPage() {
     }
   }, []);
 
-  const deliveryFee = deliveryFeeFor(subtotal);
+  const deliveryConfig = useDeliveryConfig();
+  const deliveryFee = deliveryFeeFor(subtotal, deliveryConfig);
   const discount =
     appliedPromo && subtotal >= appliedPromo.min_subtotal
       ? promoDiscountFor(appliedPromo, subtotal, deliveryFee)
