@@ -2,7 +2,7 @@
 
 import { Fragment, useState, useEffect, useCallback, useRef } from "react";
 import { effectivePrice, type PDPProduct } from "@/lib/products";
-import type { SavedOrder } from "@/lib/orders";
+import type { CancelReason, SavedOrder } from "@/lib/orders";
 import { waPhone, followupWaUrl, pendingNudgeWaUrl, type FollowupKind } from "@/lib/followups";
 import { promoLabel, type PromoCode } from "@/lib/promo";
 import { SITE_URL } from "@/lib/site";
@@ -28,6 +28,14 @@ interface Subscriber {
   email: string;
   source: string;
   created_at: string;
+}
+
+interface CustomerPref {
+  phone: string;
+  opted_in: boolean;
+  vip: boolean;
+  note: string;
+  updated_at: string;
 }
 
 interface AdminReview {
@@ -56,6 +64,8 @@ interface FormState {
   materials: string;
   care: string;
   isComingSoon: boolean;
+  publishAt: string;   // datetime-local; empty = public now
+  accessCode: string;  // promo code that unlocks early access
   preorder: boolean;
   releaseNote: string;
   fit: string;
@@ -79,6 +89,8 @@ const DEFAULT_FORM: FormState = {
   materials: "",
   care: "",
   isComingSoon: false,
+  publishAt: "",
+  accessCode: "",
   preorder: false,
   releaseNote: "",
   fit: "",
@@ -108,6 +120,20 @@ const STATUS_CLS: Record<SavedOrder["status"], string> = {
   delivered: "text-[rgb(var(--adm-emerald)/var(--adm-a80))] border-[rgb(var(--adm-emerald)/var(--adm-a30))]",
   cancelled: "text-[rgb(var(--adm-red)/var(--adm-a60))] border-[rgb(var(--adm-red)/var(--adm-a25))]",
 };
+
+const CANCEL_REASON_LABELS: Record<CancelReason, string> = {
+  refused_delivery: "Refused at delivery",
+  unreachable: "Couldn't reach customer",
+  changed_mind: "Changed mind before dispatch",
+  other: "Other",
+};
+
+/** ISO → the browser-local string a datetime-local input wants. */
+function toDatetimeLocal(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 function formatOrderDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
@@ -644,7 +670,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
 
   // UI
-  const [activeTab, setActiveTab] = useState<"overview" | "orders" | "followups" | "inventory" | "reviews" | "promos" | "hero">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "orders" | "followups" | "customers" | "inventory" | "reviews" | "promos" | "hero">("overview");
   const [showModal, setShowModal] = useState(false);
 
   // Inventory filters
@@ -656,6 +682,7 @@ export default function AdminPage() {
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
 
   // Orders
@@ -665,7 +692,16 @@ export default function AdminPage() {
   const [statusSaving, setStatusSaving] = useState<string | null>(null);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [resettingOrders, setResettingOrders] = useState(false);
+  const [cancelPrompt, setCancelPrompt] = useState<string | null>(null);
   const [followupSaving, setFollowupSaving] = useState<string | null>(null);
+
+  // Customers
+  const [customerPrefs, setCustomerPrefs] = useState<Record<string, CustomerPref>>({});
+  const [customerActing, setCustomerActing] = useState<string | null>(null);
+  const [custCity, setCustCity] = useState("all");
+  const [custSegment, setCustSegment] = useState<"all" | "opted" | "repeat">("all");
+  const [custFrom, setCustFrom] = useState("");
+  const [custTo, setCustTo] = useState("");
 
   // Restock waitlist
   const [restockRequests, setRestockRequests] = useState<RestockRequest[]>([]);
@@ -815,6 +851,16 @@ export default function AdminPage() {
     } catch { /* silent — list is non-critical */ }
   }, []);
 
+  const fetchCustomers = useCallback(async (key: string) => {
+    try {
+      const res = await fetch("/api/admin/customers", { headers: { "x-admin-key": key } });
+      if (res.ok) {
+        const rows: CustomerPref[] = await res.json();
+        setCustomerPrefs(Object.fromEntries(rows.map((r) => [r.phone, r])));
+      }
+    } catch { /* silent — toggles just start unset */ }
+  }, []);
+
   const fetchProducts = useCallback(async (key: string): Promise<boolean> => {
     setLoading(true);
     try {
@@ -844,7 +890,8 @@ export default function AdminPage() {
     fetchSettings(adminKey);
     fetchSubscribers(adminKey);
     fetchPromos(adminKey);
-  }, [adminKey, fetchProducts, fetchHeroImages, fetchOrders, fetchRestock, fetchReviews, fetchSettings, fetchSubscribers, fetchPromos]);
+    fetchCustomers(adminKey);
+  }, [adminKey, fetchProducts, fetchHeroImages, fetchOrders, fetchRestock, fetchReviews, fetchSettings, fetchSubscribers, fetchPromos, fetchCustomers]);
 
   const handleSaveDelivery = async () => {
     if (!adminKey || deliverySaving) return;
@@ -872,6 +919,26 @@ export default function AdminPage() {
       setDeliveryError(err instanceof Error ? err.message : "Failed to save.");
     } finally {
       setDeliverySaving(false);
+    }
+  };
+
+  /** Flip a customer's opted-in / VIP flag. */
+  const handleCustomerToggle = async (phone: string, field: "opted_in" | "vip", value: boolean) => {
+    if (!adminKey) return;
+    setCustomerActing(`${phone}:${field}`);
+    try {
+      const res = await fetch("/api/admin/customers", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify({ phone, [field]: value }),
+      });
+      if (!res.ok) throw new Error();
+      const saved: CustomerPref = await res.json();
+      setCustomerPrefs((prev) => ({ ...prev, [saved.phone]: saved }));
+    } catch {
+      /* leave toggle as-is; a retry click is the recovery path */
+    } finally {
+      setCustomerActing(null);
     }
   };
 
@@ -1081,6 +1148,8 @@ export default function AdminPage() {
       materials: p.materials ?? "",
       care: p.care ?? "",
       isComingSoon: p.isComingSoon ?? false,
+      publishAt: p.publishAt ? toDatetimeLocal(p.publishAt) : "",
+      accessCode: p.accessCode ?? "",
       preorder: p.preorder ?? false,
       releaseNote: p.releaseNote ?? "",
       fit: p.fit ?? "",
@@ -1129,6 +1198,8 @@ export default function AdminPage() {
       materials: form.materials,
       care: form.care,
       isComingSoon: form.isComingSoon,
+      publishAt: form.publishAt ? new Date(form.publishAt).toISOString() : "",
+      accessCode: form.accessCode.trim().toUpperCase(),
       preorder: form.isComingSoon && form.preorder,
       releaseNote: form.releaseNote,
       fit: form.fit || null,
@@ -1357,23 +1428,54 @@ export default function AdminPage() {
     }
   };
 
+  /** Launch morning, one click: makes a gated product public immediately.
+   *  The API revalidates the home/category/product pages on every PUT. */
+  const handlePublishNow = async (id: string) => {
+    if (!adminKey || publishingId) return;
+    setPublishingId(id);
+    setActionError("");
+    try {
+      const res = await fetch("/api/admin/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify({ id, publishAt: new Date().toISOString() }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error ?? "Publish failed");
+      }
+      const saved: PDPProduct = await res.json();
+      setProducts((prev) => prev.map((p) => (p.id === id ? saved : p)));
+    } catch (e) {
+      setActionError(e instanceof Error ? `Publish failed: ${e.message}` : "Publish failed.");
+    } finally {
+      setPublishingId(null);
+    }
+  };
+
   // ── Order status update ────────────────────────────────────────────────────
 
-  const handleStatusChange = async (id: string, status: SavedOrder["status"]) => {
+  const handleStatusChange = async (id: string, status: SavedOrder["status"], cancelReason?: CancelReason) => {
     if (!adminKey) return;
+    /* Cancelling always goes through the reason picker first */
+    if (status === "cancelled" && !cancelReason) {
+      setCancelPrompt(id);
+      return;
+    }
     setStatusSaving(id);
     setOrdersError("");
     try {
       const res = await fetch("/api/admin/orders", {
         method: "PUT",
         headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
-        body: JSON.stringify({ id, status }),
+        body: JSON.stringify({ id, status, ...(cancelReason ? { cancel_reason: cancelReason } : {}) }),
       });
       if (!res.ok) {
         const json = await res.json().catch(() => null);
         throw new Error(json?.error ?? "");
       }
-      setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
+      const saved: SavedOrder = await res.json();
+      setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, ...saved } : o)));
     } catch (e) {
       setOrdersError(e instanceof Error && e.message ? `Failed to update status: ${e.message}` : "Failed to update status. Try again.");
     } finally {
@@ -1458,6 +1560,9 @@ export default function AdminPage() {
   const pendingReviews = reviews.filter((r) => !r.approved).length;
   const pendingOrders = orders.filter((o) => o.status === "pending").length;
   const deliveredOrders = orders.filter((o) => o.status === "delivered").length;
+  const refusedOrders = orders.filter(
+    (o) => o.status === "cancelled" && o.cancel_reason === "refused_delivery"
+  ).length;
   const paidOrders = orders.filter((o) => PAID_STATUSES.has(o.status));
   const revenue = paidOrders.reduce((sum, o) => sum + o.total, 0);
   const now = new Date();
@@ -1520,8 +1625,114 @@ export default function AdminPage() {
     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
   const followupsDue = day2Queue.length + day14Queue.length + day45Queue.length + stalePending.length;
 
-  /* Promo performance — cancelled orders excluded so abandoned promos don't inflate the numbers */
-  const promoOrders = orders.filter((o) => o.promo_code && (o.discount ?? 0) > 0 && o.status !== "cancelled");
+  /* ── Weekly KPIs — Mon–Sun weeks in Africa/Dar_es_Salaam (UTC+3, no DST) ── */
+  const EAT_OFFSET = 3 * 3_600_000;
+  const weekStartOf = (iso: string | number): number => {
+    const shifted = new Date(new Date(iso).getTime() + EAT_OFFSET);
+    const monday =
+      Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate()) -
+      ((shifted.getUTCDay() + 6) % 7) * 86_400_000;
+    return monday - EAT_OFFSET; /* real UTC instant of Monday 00:00 EAT */
+  };
+  const hasEarlierPaidOrder = (o: SavedOrder) =>
+    orders.some(
+      (x) =>
+        x.id !== o.id &&
+        PAID_STATUSES.has(x.status) &&
+        waPhone(x.phone) === waPhone(o.phone) &&
+        new Date(x.created_at) < new Date(o.created_at)
+    );
+  const weeklyRows = Array.from({ length: 12 }, (_, i) => {
+    const start = weekStartOf(now.getTime()) - i * 7 * 86_400_000;
+    const end = start + 7 * 86_400_000;
+    const inWeek = (iso?: string) =>
+      !!iso && new Date(iso).getTime() >= start && new Date(iso).getTime() < end;
+
+    /* Paid orders bucket to their confirmed week (falling back to created) */
+    const paidInWeek = orders.filter(
+      (o) => PAID_STATUSES.has(o.status) && inWeek(o.status_history?.confirmed ?? o.created_at)
+    );
+    const wkRevenue = paidInWeek.reduce((sum, o) => sum + o.total, 0);
+    const createdInWeek = orders.filter((o) => inWeek(o.created_at));
+    const createdPaid = createdInWeek.filter((o) => PAID_STATUSES.has(o.status)).length;
+    const createdCancelled = createdInWeek.filter((o) => o.status === "cancelled").length;
+    const createdPending = createdInWeek.filter((o) => o.status === "pending").length;
+    const deliveredWk = orders.filter((o) => inWeek(o.status_history?.delivered)).length;
+    const refusedWk = orders.filter(
+      (o) => o.cancel_reason === "refused_delivery" && inWeek(o.status_history?.cancelled)
+    ).length;
+    const repeatWk = paidInWeek.filter(hasEarlierPaidOrder).length;
+
+    return {
+      start,
+      orders: paidInWeek.length,
+      revenue: wkRevenue,
+      aov: paidInWeek.length > 0 ? Math.round(wkRevenue / paidInWeek.length) : 0,
+      leadPct:
+        createdPaid + createdCancelled > 0
+          ? Math.round((createdPaid / (createdPaid + createdCancelled)) * 100)
+          : null,
+      pendingCount: createdPending,
+      refusalPct:
+        deliveredWk + refusedWk > 0 ? Math.round((refusedWk / (deliveredWk + refusedWk)) * 100) : null,
+      repeatPct: paidInWeek.length > 0 ? Math.round((repeatWk / paidInWeek.length) * 100) : null,
+      newSubs: subscribers.filter((s) => inWeek(s.created_at)).length,
+    };
+  });
+
+  /* ── Customers — aggregated from orders, keyed by normalized phone ── */
+  const customersAll = (() => {
+    const map = new Map<
+      string,
+      { phone: string; name: string; city: string; first: string; last: string; paidCount: number; paidTotal: number }
+    >();
+    const chronological = [...orders].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+    for (const o of chronological) {
+      const phone = waPhone(o.phone);
+      const cur =
+        map.get(phone) ??
+        { phone, name: o.customer_name, city: o.city, first: o.created_at, last: o.created_at, paidCount: 0, paidTotal: 0 };
+      /* latest order wins for display fields */
+      cur.name = o.customer_name;
+      cur.city = o.city;
+      cur.last = o.created_at;
+      if (PAID_STATUSES.has(o.status)) {
+        cur.paidCount += 1;
+        cur.paidTotal += o.total;
+      }
+      map.set(phone, cur);
+    }
+    return [...map.values()].sort((a, b) => b.paidTotal - a.paidTotal);
+  })();
+  const customersWithPaid = customersAll.filter((c) => c.paidCount >= 1).length;
+  const repeatCustomerCount = customersAll.filter((c) => c.paidCount >= 2).length;
+  const repeatRate = customersWithPaid > 0 ? Math.round((repeatCustomerCount / customersWithPaid) * 100) : 0;
+  const optedInCount = customersAll.filter((c) => customerPrefs[c.phone]?.opted_in).length;
+  const customerCities = [...new Set(customersAll.map((c) => c.city))].sort();
+  const filteredCustomers = customersAll.filter((c) => {
+    if (custCity !== "all" && c.city !== custCity) return false;
+    if (custSegment === "opted" && !customerPrefs[c.phone]?.opted_in) return false;
+    if (custSegment === "repeat" && c.paidCount < 2) return false;
+    if (custFrom || custTo) {
+      const from = custFrom ? new Date(custFrom).getTime() : -Infinity;
+      const to = custTo ? new Date(custTo).getTime() + 86_400_000 : Infinity; // inclusive end day
+      const boughtInRange = orders.some(
+        (o) =>
+          waPhone(o.phone) === c.phone &&
+          PAID_STATUSES.has(o.status) &&
+          new Date(o.created_at).getTime() >= from &&
+          new Date(o.created_at).getTime() < to
+      );
+      if (!boughtInRange) return false;
+    }
+    return true;
+  });
+
+  /* Promo performance — cancelled orders excluded so abandoned promos don't
+     inflate the numbers. Zero-discount orders still count (access-key codes). */
+  const promoOrders = orders.filter((o) => o.promo_code && o.status !== "cancelled");
   const discountGiven = promoOrders.reduce((sum, o) => sum + (o.discount ?? 0), 0);
   const totalRedemptions = promos.reduce((sum, p) => sum + p.use_count, 0);
   const activeCodes = promos.filter(
@@ -1533,15 +1744,25 @@ export default function AdminPage() {
   const promoRows = promos
     .map((p) => {
       const codeOrders = promoOrders.filter((o) => o.promo_code === p.code);
+      const paidCodeOrders = codeOrders.filter((o) => PAID_STATUSES.has(o.status));
+      const revenue = paidCodeOrders.reduce((sum, o) => sum + o.total, 0);
+      const visits = p.visit_count ?? 0;
+      const newCustomers = paidCodeOrders.filter((o) => !hasEarlierPaidOrder(o)).length;
       return {
         code: p.code,
         label: promoLabel(p),
         uses: p.use_count,
+        ordersCount: paidCodeOrders.length,
+        aov: paidCodeOrders.length > 0 ? Math.round(revenue / paidCodeOrders.length) : 0,
+        visits,
+        convPct: visits > 0 ? Math.round((paidCodeOrders.length / visits) * 100) : null,
+        newPct:
+          paidCodeOrders.length > 0 ? Math.round((newCustomers / paidCodeOrders.length) * 100) : null,
         discount: codeOrders.reduce((sum, o) => sum + (o.discount ?? 0), 0),
-        revenue: codeOrders.filter((o) => PAID_STATUSES.has(o.status)).reduce((sum, o) => sum + o.total, 0),
+        revenue,
       };
     })
-    .filter((r) => r.uses > 0)
+    .filter((r) => r.uses > 0 || r.visits > 0)
     .sort((a, b) => b.uses - a.uses);
 
   // ── Login screen ───────────────────────────────────────────────────────────
@@ -1602,7 +1823,7 @@ export default function AdminPage() {
 
       <main className="px-6 md:px-10 py-8 max-w-7xl mx-auto">
         <nav className="flex gap-8 border-b border-[rgb(var(--adm-fg)/var(--adm-a08))] mb-10">
-          {(["overview", "orders", "followups", "inventory", "reviews", "promos", "hero"] as const).map((tab) => (
+          {(["overview", "orders", "followups", "customers", "inventory", "reviews", "promos", "hero"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -1627,11 +1848,50 @@ export default function AdminPage() {
         {/* ── Overview ──────────────────────────────────────────────────────── */}
         {activeTab === "overview" && (
           <section>
+            <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] mb-2">Weekly Scoreboard</p>
+            <p className="text-[9px] text-[rgb(var(--adm-fg)/var(--adm-a20))] mb-4">Mon–Sun weeks, East Africa Time. Orders count in the week payment was confirmed.</p>
+            <div className="border border-[rgb(var(--adm-fg)/var(--adm-a08))] overflow-x-auto mb-10">
+              <table className="w-full min-w-[820px]">
+                <thead>
+                  <tr className="border-b border-[rgb(var(--adm-fg)/var(--adm-a08))]">
+                    {["Week", "Orders", "Revenue (TZS)", "AOV", "Lead→Paid", "Refusal", "Repeat", "New Subs"].map((h, i) => (
+                      <th key={i} className="text-left text-[9px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] px-4 py-3 font-normal">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {weeklyRows.map((w, i) => (
+                    <tr key={w.start} className={`border-b border-[rgb(var(--adm-fg)/var(--adm-a04))] ${i === 0 ? "" : "text-[rgb(var(--adm-fg)/var(--adm-a50))]"}`}>
+                      <td className="px-4 py-2.5 text-xs whitespace-nowrap text-[rgb(var(--adm-fg)/var(--adm-a50))]">
+                        {new Date(w.start + EAT_OFFSET).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })}
+                        {i === 0 && <span className="ml-2 text-[8px] tracking-wider uppercase text-[rgb(var(--adm-emerald)/var(--adm-a70))]">this week</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs tabular-nums">{w.orders}</td>
+                      <td className="px-4 py-2.5 text-xs tabular-nums">{w.revenue.toLocaleString("en-TZ")}</td>
+                      <td className="px-4 py-2.5 text-xs tabular-nums">{w.aov > 0 ? w.aov.toLocaleString("en-TZ") : "—"}</td>
+                      <td className="px-4 py-2.5 text-xs tabular-nums">
+                        {w.leadPct != null ? `${w.leadPct}%` : "—"}
+                        {w.pendingCount > 0 && <span className="text-[rgb(var(--adm-amber)/var(--adm-a70))] ml-1">({w.pendingCount} pending)</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs tabular-nums">{w.refusalPct != null ? `${w.refusalPct}%` : "—"}</td>
+                      <td className="px-4 py-2.5 text-xs tabular-nums">{w.repeatPct != null ? `${w.repeatPct}%` : "—"}</td>
+                      <td className="px-4 py-2.5 text-xs tabular-nums">{w.newSubs}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
             <p className="text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] mb-6">Orders &amp; Revenue</p>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
               <StatCard label="Total Orders" value={orders.length} />
               <StatCard label="Pending" value={pendingOrders} sub="Awaiting payment confirmation" />
               <StatCard label="Delivered" value={deliveredOrders} />
+              <StatCard
+                label="COD Refusal Rate"
+                value={deliveredOrders + refusedOrders > 0 ? `${Math.round((refusedOrders / (deliveredOrders + refusedOrders)) * 100)}%` : "—"}
+                sub={`${refusedOrders} refused at delivery`}
+              />
               <StatCard label="Email Subscribers" value={subscribers.length} sub="Footer + checkout sign-ups" />
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-10">
@@ -1667,10 +1927,10 @@ export default function AdminPage() {
             </div>
             {promoRows.length > 0 && (
               <div className="border border-[rgb(var(--adm-fg)/var(--adm-a10))] mb-10 overflow-x-auto">
-                <table className="w-full min-w-[520px]">
+                <table className="w-full min-w-[880px]">
                   <thead>
                     <tr className="border-b border-[rgb(var(--adm-fg)/var(--adm-a08))]">
-                      {["Code", "Uses", "Discount (TZS)", "Revenue (TZS)"].map((h, i) => (
+                      {["Code", "Visits", "Orders", "Visit→Order", "AOV (TZS)", "New Cust.", "Discount (TZS)", "Revenue (TZS)"].map((h, i) => (
                         <th key={i} className="text-left text-[9px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] px-4 py-3 font-normal">{h}</th>
                       ))}
                     </tr>
@@ -1682,7 +1942,11 @@ export default function AdminPage() {
                           <span className="text-xs font-mono text-[rgb(var(--adm-fg))]">{r.code}</span>
                           <span className="text-[10px] text-[rgb(var(--adm-fg)/var(--adm-a30))] ml-2">{r.label}</span>
                         </td>
-                        <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a50))] tabular-nums">{r.uses}</td>
+                        <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a50))] tabular-nums">{r.visits}</td>
+                        <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a80))] tabular-nums">{r.ordersCount}</td>
+                        <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a50))] tabular-nums">{r.convPct != null ? `${r.convPct}%` : "—"}</td>
+                        <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a50))] tabular-nums">{r.aov > 0 ? r.aov.toLocaleString("en-TZ") : "—"}</td>
+                        <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a50))] tabular-nums">{r.newPct != null ? `${r.newPct}%` : "—"}</td>
                         <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a50))] tabular-nums">{r.discount.toLocaleString("en-TZ")}</td>
                         <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a80))] tabular-nums">{r.revenue.toLocaleString("en-TZ")}</td>
                       </tr>
@@ -1872,6 +2136,11 @@ export default function AdminPage() {
                                     })()}
                                   </div>
                                   <div>
+                                    {o.status === "cancelled" && o.cancel_reason && (
+                                      <p className="text-[10px] text-[rgb(var(--adm-red)/var(--adm-a70))] mb-2">
+                                        Cancelled: {CANCEL_REASON_LABELS[o.cancel_reason]}
+                                      </p>
+                                    )}
                                     <p className="text-[8px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] mb-1">Delivery Note</p>
                                     <p className="text-xs text-[rgb(var(--adm-fg)/var(--adm-a60))]">{o.delivery_note || "—"}</p>
                                   </div>
@@ -2001,6 +2270,142 @@ export default function AdminPage() {
                 </div>
               </div>
             )}
+          </section>
+        )}
+
+        {/* ── Customers ─────────────────────────────────────────────────────── */}
+        {activeTab === "customers" && (
+          <section>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+              <StatCard label="Customers" value={customersAll.length} sub="Unique phone numbers across all orders" />
+              <StatCard label="Repeat Rate" value={`${repeatRate}%`} sub="2+ paid orders ÷ 1+ paid orders" />
+              <StatCard label="Opted In" value={optedInCount} sub="OK to receive WhatsApp broadcasts" />
+              <StatCard label="VIP" value={customersAll.filter((c) => customerPrefs[c.phone]?.vip).length} sub="Early access & special treatment" />
+            </div>
+
+            {/* Filters + export */}
+            <div className="border border-[rgb(var(--adm-fg)/var(--adm-a08))] p-4 mb-6 flex flex-wrap items-end gap-3">
+              <div>
+                <label className="block text-[8px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] mb-1.5">City</label>
+                <select
+                  value={custCity}
+                  onChange={(e) => setCustCity(e.target.value)}
+                  className="bg-[var(--adm-bg2)] border border-[rgb(var(--adm-fg)/var(--adm-a20))] text-[rgb(var(--adm-fg))] px-3 py-2 text-xs focus:outline-none focus:border-[rgb(var(--adm-fg)/var(--adm-a60))] transition-colors cursor-pointer"
+                >
+                  <option value="all">All cities</option>
+                  {customerCities.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="flex gap-1.5">
+                {([["all", "All"], ["opted", "Opted-in"], ["repeat", "Repeat"]] as const).map(([value, label]) => (
+                  <button
+                    key={value}
+                    onClick={() => setCustSegment(value)}
+                    className={`text-[9px] tracking-[0.2em] uppercase border px-3 py-2 transition-colors ${
+                      custSegment === value
+                        ? "border-[rgb(var(--adm-fg))] text-[rgb(var(--adm-fg))]"
+                        : "border-[rgb(var(--adm-fg)/var(--adm-a15))] text-[rgb(var(--adm-fg)/var(--adm-a40))] hover:border-[rgb(var(--adm-fg)/var(--adm-a35))]"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div>
+                <label className="block text-[8px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] mb-1.5">Bought From</label>
+                <input type="date" value={custFrom} onChange={(e) => setCustFrom(e.target.value)}
+                  className="bg-transparent border border-[rgb(var(--adm-fg)/var(--adm-a20))] text-[rgb(var(--adm-fg))] px-3 py-1.5 text-xs focus:outline-none focus:border-[rgb(var(--adm-fg)/var(--adm-a60))] transition-colors" />
+              </div>
+              <div>
+                <label className="block text-[8px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] mb-1.5">To</label>
+                <input type="date" value={custTo} onChange={(e) => setCustTo(e.target.value)}
+                  className="bg-transparent border border-[rgb(var(--adm-fg)/var(--adm-a20))] text-[rgb(var(--adm-fg))] px-3 py-1.5 text-xs focus:outline-none focus:border-[rgb(var(--adm-fg)/var(--adm-a60))] transition-colors" />
+              </div>
+              <div className="flex-1" />
+              <button
+                onClick={() => {
+                  const rows = [
+                    ["name", "phone", "city", "orders", "total", "opted_in"],
+                    ...filteredCustomers.map((c) => [
+                      c.name, c.phone, c.city, String(c.paidCount), String(c.paidTotal),
+                      customerPrefs[c.phone]?.opted_in ? "yes" : "no",
+                    ]),
+                  ];
+                  const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+                  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "lovlos-customers.csv";
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="text-[9px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] hover:text-[rgb(var(--adm-fg)/var(--adm-a70))] transition-colors border border-[rgb(var(--adm-fg)/var(--adm-a15))] hover:border-[rgb(var(--adm-fg)/var(--adm-a35))] px-4 py-2"
+              >
+                Export CSV · {filteredCustomers.length}
+              </button>
+            </div>
+
+            <div className="border border-[rgb(var(--adm-fg)/var(--adm-a08))] overflow-x-auto">
+              <table className="w-full min-w-[860px]">
+                <thead>
+                  <tr className="border-b border-[rgb(var(--adm-fg)/var(--adm-a08))]">
+                    {["Customer", "City", "Paid Orders", "Lifetime (TZS)", "First", "Last", "Opted-in", "VIP"].map((h, i) => (
+                      <th key={i} className="text-left text-[9px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a25))] px-4 py-3 font-normal">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredCustomers.map((c) => {
+                    const pref = customerPrefs[c.phone];
+                    return (
+                      <tr key={c.phone} className="border-b border-[rgb(var(--adm-fg)/var(--adm-a04))] hover:bg-[rgb(var(--adm-fg)/var(--adm-a015))] transition-colors">
+                        <td className="px-4 py-3">
+                          <p className="text-xs text-[rgb(var(--adm-fg)/var(--adm-a80))]">{c.name}</p>
+                          <a
+                            href={`https://wa.me/${c.phone}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-[rgb(var(--adm-emerald)/var(--adm-a60))] hover:text-[rgb(var(--adm-emerald))] transition-colors"
+                          >
+                            {c.phone}
+                          </a>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a50))]">{c.city}</td>
+                        <td className="px-4 py-3 text-xs tabular-nums text-[rgb(var(--adm-fg)/var(--adm-a80))]">
+                          {c.paidCount}
+                          {c.paidCount >= 2 && <span className="ml-1.5 text-[8px] tracking-wider uppercase text-[rgb(var(--adm-emerald)/var(--adm-a70))]">repeat</span>}
+                        </td>
+                        <td className="px-4 py-3 text-xs tabular-nums text-[rgb(var(--adm-fg)/var(--adm-a80))]">{c.paidTotal.toLocaleString("en-TZ")}</td>
+                        <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a40))] whitespace-nowrap">{formatOrderDate(c.first)}</td>
+                        <td className="px-4 py-3 text-xs text-[rgb(var(--adm-fg)/var(--adm-a40))] whitespace-nowrap">{formatOrderDate(c.last)}</td>
+                        {(["opted_in", "vip"] as const).map((field) => (
+                          <td key={field} className="px-4 py-3">
+                            <button
+                              onClick={() => handleCustomerToggle(c.phone, field, !(field === "opted_in" ? pref?.opted_in : pref?.vip))}
+                              disabled={customerActing === `${c.phone}:${field}`}
+                              className={`text-[9px] tracking-[0.15em] uppercase border px-2.5 py-1.5 transition-colors disabled:opacity-40 ${
+                                (field === "opted_in" ? pref?.opted_in : pref?.vip)
+                                  ? "text-[rgb(var(--adm-emerald)/var(--adm-a80))] border-[rgb(var(--adm-emerald)/var(--adm-a30))] hover:border-[rgb(var(--adm-emerald)/var(--adm-a60))]"
+                                  : "text-[rgb(var(--adm-fg)/var(--adm-a30))] border-[rgb(var(--adm-fg)/var(--adm-a15))] hover:border-[rgb(var(--adm-fg)/var(--adm-a35))]"
+                              }`}
+                            >
+                              {(field === "opted_in" ? pref?.opted_in : pref?.vip) ? "Yes" : "No"}
+                            </button>
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                  {filteredCustomers.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-20 text-center text-[9px] tracking-[0.3em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a15))]">
+                        No customers match this filter
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </section>
         )}
 
@@ -2236,6 +2641,20 @@ export default function AdminPage() {
                             <span className="text-[9px] tracking-wider uppercase text-[rgb(var(--adm-amber)/var(--adm-a60))]">Coming Soon</span>
                           ) : (
                             <span className="text-[9px] tracking-wider uppercase text-[rgb(var(--adm-emerald)/var(--adm-a60))]">Live</span>
+                          )}
+                          {p.publishAt && new Date(p.publishAt).getTime() > Date.now() && (
+                            <div className="mt-1">
+                              <p className="text-[9px] text-[rgb(var(--adm-violet)/var(--adm-a80))]">
+                                {p.accessCode ? `Early access · ${p.accessCode}` : "Gated"} · public {formatOrderDate(p.publishAt)}
+                              </p>
+                              <button
+                                onClick={() => handlePublishNow(p.id)}
+                                disabled={publishingId === p.id}
+                                className="text-[9px] tracking-[0.2em] uppercase text-[rgb(var(--adm-emerald)/var(--adm-a70))] hover:text-[rgb(var(--adm-emerald))] transition-colors disabled:opacity-40 mt-0.5"
+                              >
+                                {publishingId === p.id ? "Publishing..." : "Publish Now →"}
+                              </button>
+                            </div>
                           )}
                         </td>
                         <td className="px-4 py-3 text-right">
@@ -2721,6 +3140,47 @@ export default function AdminPage() {
         )}
       </main>
 
+      {/* ── Cancel-reason picker — cancelling is blocked until a reason is chosen ── */}
+      {cancelPrompt && (
+        <div
+          className={`${themeCls} fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50`}
+          onClick={() => setCancelPrompt(null)}
+        >
+          <div
+            className="bg-[var(--adm-bg)] border border-[rgb(var(--adm-fg)/var(--adm-a15))] p-6 w-full max-w-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-[10px] tracking-[0.3em] uppercase font-bold text-[rgb(var(--adm-fg))] mb-1">
+              Cancel {cancelPrompt}
+            </p>
+            <p className="text-[10px] text-[rgb(var(--adm-fg)/var(--adm-a40))] mb-5">
+              Why is this order being cancelled? Refusals feed the COD refusal rate.
+            </p>
+            <div className="space-y-2">
+              {(Object.keys(CANCEL_REASON_LABELS) as CancelReason[]).map((reason) => (
+                <button
+                  key={reason}
+                  onClick={() => {
+                    const id = cancelPrompt;
+                    setCancelPrompt(null);
+                    handleStatusChange(id, "cancelled", reason);
+                  }}
+                  className="w-full text-left text-xs text-[rgb(var(--adm-fg)/var(--adm-a70))] border border-[rgb(var(--adm-fg)/var(--adm-a15))] hover:border-[rgb(var(--adm-fg)/var(--adm-a50))] hover:text-[rgb(var(--adm-fg))] px-4 py-3 transition-colors"
+                >
+                  {CANCEL_REASON_LABELS[reason]}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setCancelPrompt(null)}
+              className="mt-4 text-[9px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a30))] hover:text-[rgb(var(--adm-fg)/var(--adm-a60))] transition-colors"
+            >
+              Keep the order
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Add / Edit Modal ───────────────────────────────────────────────── */}
       {showModal && (
         <div
@@ -2852,6 +3312,38 @@ export default function AdminPage() {
                   )}
                 </div>
               )}
+
+              {/* Early access — hidden launch: public sees Coming Soon until
+                  the publish moment; the access code unlocks buying early */}
+              <div className="border border-[rgb(var(--adm-fg)/var(--adm-a10))] p-4 space-y-3">
+                <p className="text-[9px] tracking-[0.25em] uppercase text-[rgb(var(--adm-fg)/var(--adm-a40))] font-bold">Early Access / Scheduled Publish</p>
+                <p className="text-[9px] text-[rgb(var(--adm-fg)/var(--adm-a25))]">
+                  Set a publish time and the product shows as Coming Soon until then. Pick an access code and
+                  anyone arriving via lovlos.com/?promo=CODE can buy before the public. Leave both empty for a normal product.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Public From">
+                    <input
+                      type="datetime-local"
+                      value={form.publishAt}
+                      onChange={(e) => setForm({ ...form, publishAt: e.target.value })}
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field label="Access Code">
+                    <select
+                      value={form.accessCode}
+                      onChange={(e) => setForm({ ...form, accessCode: e.target.value })}
+                      className={selectCls}
+                    >
+                      <option value="">None — hard gate until publish</option>
+                      {promos.filter((p) => p.active).map((p) => (
+                        <option key={p.code} value={p.code}>{p.code}</option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+              </div>
 
               {/* Multi-image gallery */}
               <ImageGalleryEditor
